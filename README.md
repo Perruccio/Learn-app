@@ -1,0 +1,40 @@
+# Learn Reader
+
+Lettore PDF web per studiare dai libri del repository [`Perruccio/Learn`](https://github.com/Perruccio/Learn) (privato), con:
+
+- lettura a schermo intero, zoom (anche pinch e Ctrl+rotella), indice del PDF, ricerca nel testo;
+- evidenziazioni del testo in 4 colori, evidenziazioni ad area (per PDF scansionati e formule), note sulla pagina e note sulle evidenziazioni;
+- ripresa dall'ultima pagina letta, su qualsiasi dispositivo;
+- sincronizzazione su GitHub: ogni modifica è salvata subito sul dispositivo e sincronizzata in background pochi secondi dopo (e quando chiudi il libro o lasci l'app). Le modifiche fatte su dispositivi diversi vengono unite, annotazione per annotazione;
+- PDF scaricati una sola volta e poi letti dalla cache del dispositivo (anche offline).
+
+**App:** <https://perruccio.github.io/Learn-app/>
+
+## Come funziona
+
+Questo repository (pubblico) contiene solo il codice. I PDF e le annotazioni stanno nel repository privato, e l'app li legge e li scrive tramite l'API di GitHub con un token personale salvato nel browser.
+
+Per ogni libro `cartella/nome.pdf` le annotazioni stanno in `cartella/nome.annotazioni.json`. Il file è JSON leggibile: un'annotazione per blocco, con pagina, colore, testo evidenziato, nota e posizione (in frazioni della pagina, quindi indipendente dallo zoom).
+
+Link diretto a un libro e a una pagina:
+
+```
+https://perruccio.github.io/Learn-app/#read=matematica/libri/axler-ladr-4ed.pdf&page=20
+```
+
+## Primo accesso (una volta per dispositivo)
+
+1. Crea un *fine-grained token* su GitHub: **Settings → Developer settings → Fine-grained tokens → Generate new token**.
+   - **Repository access:** *Only select repositories* → `Learn`.
+   - **Permissions → Contents:** *Read and write*.
+2. Apri l'app, incolla il token e premi **Connetti**.
+
+Su iPhone e Android: dal browser usa **Condividi → Aggiungi alla schermata Home**. L'app si apre a schermo intero, come un'app normale.
+
+## Sviluppo
+
+Sito statico, senza build: HTML, CSS e moduli JavaScript in `js/`. PDF.js 4.10.38 (build *legacy*, licenza Apache-2.0) è incluso in `vendor/pdfjs/`.
+
+```bash
+python -m http.server 8000   # poi apri http://localhost:8000
+```

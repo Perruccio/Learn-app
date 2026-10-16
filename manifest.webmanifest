@@ -1,0 +1,15 @@
+{
+  "name": "Learn Reader",
+  "short_name": "Reader",
+  "description": "Lettore PDF con evidenziazioni e note sincronizzate su GitHub.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f5f2",
+  "theme_color": "#2c6e60",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

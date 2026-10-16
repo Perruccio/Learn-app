@@ -1,0 +1,260 @@
+// Local-first annotation store with background sync to GitHub.
+//
+// Every book has one JSON file next to the PDF ("<name>.annotazioni.json").
+// Edits are written to localStorage immediately; a debounced background sync
+// pulls the remote file, merges per annotation (newest `updatedAt` wins,
+// deletions are kept as tombstones) and pushes the result.
+
+import { storage, prettyName } from './util.js';
+
+const DOC_VERSION = 1;
+const TOMBSTONE_TTL_MS = 180 * 24 * 3600 * 1000;
+const AUTO_SYNC_DELAY_MS = 4000;
+const MAX_ATTEMPTS = 4;
+
+export function annotationPath(pdfPath) {
+  return pdfPath.replace(/\.pdf$/i, '') + '.annotazioni.json';
+}
+
+export function emptyDoc(book) {
+  return { version: DOC_VERSION, book, lastPage: null, annotations: {} };
+}
+
+/** Normalize whatever is stored (local or remote) into the in-memory shape. */
+export function reviveDoc(raw, book) {
+  const doc = emptyDoc(book);
+  if (!raw || typeof raw !== 'object') return doc;
+  doc.lastPage = raw.lastPage && Number.isFinite(raw.lastPage.page) ? raw.lastPage : null;
+  const list = Array.isArray(raw.annotations) ? raw.annotations : Object.values(raw.annotations || {});
+  for (const a of list) {
+    if (a && typeof a.id === 'string' && Number.isFinite(a.page)) doc.annotations[a.id] = a;
+  }
+  return doc;
+}
+
+function anchorY(a) {
+  if (Array.isArray(a.rects) && a.rects.length) return a.rects[0][1];
+  return Number.isFinite(a.y) ? a.y : 0;
+}
+
+function byPosition(a, b) {
+  return a.page - b.page || anchorY(a) - anchorY(b) || (a.createdAt || 0) - (b.createdAt || 0);
+}
+
+const KEY_ORDER = ['id', 'type', 'page', 'color', 'text', 'note', 'rects', 'x', 'y', 'createdAt', 'updatedAt', 'deleted'];
+
+function canonical(a) {
+  const out = {};
+  for (const k of KEY_ORDER) if (a[k] !== undefined) out[k] = a[k];
+  for (const k of Object.keys(a)) if (!(k in out)) out[k] = a[k];
+  return out;
+}
+
+/** Stable, human-readable serialization (one annotation per block, compact rect arrays). */
+export function serializeDoc(doc) {
+  const now = Date.now();
+  const annotations = Object.values(doc.annotations)
+    .filter((a) => !(a.deleted && now - (a.updatedAt || 0) > TOMBSTONE_TTL_MS))
+    .sort(byPosition)
+    .map(canonical);
+  const json = JSON.stringify({ version: DOC_VERSION, book: doc.book, lastPage: doc.lastPage, annotations }, null, 2);
+  // Collapse innermost numeric arrays ([x, y, w, h]) onto one line.
+  return json.replace(/\[\s+(-?[\d.e-]+(?:,\s+-?[\d.e-]+)*)\s+\]/g, (_, inner) => `[${inner.split(/,\s+/).join(', ')}]`) + '\n';
+}
+
+function newerPosition(a, b) {
+  if (!a) return b;
+  if (!b) return a;
+  return (a.at || 0) >= (b.at || 0) ? a : b;
+}
+
+/** Per-annotation last-writer-wins merge. `local` wins ties. */
+export function mergeDocs(local, remote) {
+  const out = emptyDoc(local.book || remote.book);
+  const ids = new Set([...Object.keys(local.annotations), ...Object.keys(remote.annotations)]);
+  for (const id of ids) {
+    const x = local.annotations[id];
+    const y = remote.annotations[id];
+    out.annotations[id] = !x ? y : !y ? x : (x.updatedAt || 0) >= (y.updatedAt || 0) ? x : y;
+  }
+  out.lastPage = newerPosition(local.lastPage, remote.lastPage);
+  return out;
+}
+
+function isEmptyDoc(doc) {
+  return !doc.lastPage && Object.keys(doc.annotations).length === 0;
+}
+
+export function liveAnnotations(doc) {
+  return Object.values(doc.annotations).filter((a) => !a.deleted).sort(byPosition);
+}
+
+/**
+ * Events: 'change' {detail: {book, doc, remote}} and 'status' {detail: status}.
+ * status = {state: 'synced'|'pending'|'syncing'|'error'|'offline', message}
+ */
+export class SyncManager extends EventTarget {
+  constructor(gh, cfg) {
+    super();
+    this.gh = gh;
+    this.prefix = `learnreader:doc:${cfg.owner}/${cfg.repo}@${cfg.branch}:`;
+    this.timers = new Map();
+    this.running = new Map();
+    this.again = new Set();
+    this.lastError = null;
+    // Books whose only unsynced change is the reading position (not shown as pending).
+    this.positionOnly = new Set();
+    // Books with unsynced local changes (kept in memory to avoid re-parsing storage).
+    this.dirty = new Set(
+      storage
+        .keys(this.prefix)
+        .filter((k) => storage.get(k, {})?.dirty)
+        .map((k) => k.slice(this.prefix.length)),
+    );
+  }
+
+  key(book) {
+    return this.prefix + book;
+  }
+
+  /** Current local state of a book: {doc, dirty, rev}. */
+  load(book) {
+    const saved = storage.get(this.key(book), null);
+    if (!saved) return { doc: emptyDoc(book), dirty: false, rev: 0 };
+    return { doc: reviveDoc(saved.doc, book), dirty: !!saved.dirty, rev: saved.rev || 0 };
+  }
+
+  _save(book, doc, dirty, rev) {
+    const ok = storage.set(this.key(book), {
+      doc: { ...doc, annotations: Object.values(doc.annotations) },
+      dirty,
+      rev,
+    });
+    if (!ok) this.lastError = 'Spazio locale pieno: sincronizza appena possibile';
+    if (dirty) this.dirty.add(book);
+    else {
+      this.dirty.delete(book);
+      this.positionOnly.delete(book);
+    }
+  }
+
+  _emit(book, doc, remote = false) {
+    this.dispatchEvent(new CustomEvent('change', { detail: { book, doc, remote } }));
+  }
+
+  /**
+   * Apply a local edit. `fn(doc)` mutates the document. With `schedule: false`
+   * the change is stored locally and only synced at the next sync point
+   * (used for the reading position, to avoid a commit on every page turn).
+   */
+  mutate(book, fn, { schedule = true, silent = false } = {}) {
+    const state = this.load(book);
+    fn(state.doc);
+    if (schedule) this.positionOnly.delete(book);
+    else if (!this.dirty.has(book)) this.positionOnly.add(book);
+    this._save(book, state.doc, true, state.rev + 1);
+    if (!silent) this._emit(book, state.doc);
+    if (schedule) this.schedule(book);
+    else this._updateStatus();
+    return state.doc;
+  }
+
+  schedule(book, delay = AUTO_SYNC_DELAY_MS) {
+    clearTimeout(this.timers.get(book));
+    this.timers.set(
+      book,
+      setTimeout(() => {
+        this.timers.delete(book);
+        this.sync(book).catch(() => {});
+      }, delay),
+    );
+    this._updateStatus();
+  }
+
+  dirtyBooks() {
+    return [...this.dirty];
+  }
+
+  /** Pull + merge + push one book. Concurrent calls are coalesced. */
+  sync(book) {
+    if (this.running.has(book)) {
+      this.again.add(book);
+      return this.running.get(book);
+    }
+    clearTimeout(this.timers.get(book));
+    this.timers.delete(book);
+    const task = this._sync(book)
+      .then((doc) => {
+        this.lastError = null;
+        return doc;
+      })
+      .catch((err) => {
+        this.lastError = err.status === 0 ? 'offline' : err.message;
+        if (err.status === 401) this.dispatchEvent(new CustomEvent('unauthorized'));
+        throw err;
+      })
+      .finally(() => {
+        this.running.delete(book);
+        if (this.again.delete(book)) this.sync(book).catch(() => {});
+        this._updateStatus();
+      });
+    this.running.set(book, task);
+    this._updateStatus();
+    return task;
+  }
+
+  async _sync(book) {
+    const path = annotationPath(book);
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      const start = this.load(book);
+      const remote = await this.gh.getTextFile(path);
+      let remoteDoc = emptyDoc(book);
+      if (remote) {
+        try {
+          remoteDoc = reviveDoc(JSON.parse(remote.text), book);
+        } catch {
+          // A corrupted remote file is replaced by the local version (git keeps the history).
+        }
+      }
+      const merged = mergeDocs(start.doc, remoteDoc);
+      const mergedText = serializeDoc(merged);
+      const needsPush = remote ? mergedText !== remote.text : !isEmptyDoc(merged);
+      if (needsPush) {
+        try {
+          await this.gh.putFile(path, { text: mergedText }, remote?.sha, `reader: annotazioni ${prettyName(book)}`);
+        } catch (err) {
+          if (err.status === 409 || err.status === 422) continue; // someone else pushed first: retry
+          throw err;
+        }
+      }
+      // Fold the result back, keeping edits made while the request was in flight.
+      const now = this.load(book);
+      const finalDoc = mergeDocs(now.doc, merged);
+      const stillDirty = now.rev !== start.rev;
+      this._save(book, finalDoc, stillDirty, now.rev);
+      this._emit(book, finalDoc, true);
+      if (stillDirty) this.schedule(book, 1000);
+      return finalDoc;
+    }
+    throw new Error('Troppi conflitti di sincronizzazione, riprovo più tardi');
+  }
+
+  /** Sync every book with local changes (app start, leaving the page, back online). */
+  async syncAll() {
+    const books = this.dirtyBooks();
+    await Promise.allSettled(books.map((b) => this.sync(b)));
+  }
+
+  status() {
+    if (this.running.size) return { state: 'syncing', message: 'Sincronizzo…' };
+    if (this.lastError === 'offline') return { state: 'offline', message: 'Offline: salvato in locale' };
+    if (this.lastError) return { state: 'error', message: this.lastError };
+    const pending = this.dirtyBooks().some((b) => !this.positionOnly.has(b));
+    if (this.timers.size || pending) return { state: 'pending', message: 'Salvato in locale' };
+    return { state: 'synced', message: 'Sincronizzato' };
+  }
+
+  _updateStatus() {
+    this.dispatchEvent(new CustomEvent('status', { detail: this.status() }));
+  }
+}

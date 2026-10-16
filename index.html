@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Learn Reader</title>
+  <meta name="description" content="Lettore PDF con evidenziazioni e note sincronizzate su GitHub.">
+  <meta name="theme-color" content="#f6f5f2" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#18191b" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Reader">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="vendor/pdfjs/web/pdf_viewer.css">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body data-view="">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+      <symbol id="i-left" viewBox="0 0 24 24"><path d="M14.5 6.5L9 12l5.5 5.5"/></symbol>
+      <symbol id="i-right" viewBox="0 0 24 24"><path d="M9.5 6.5L15 12l-5.5 5.5"/></symbol>
+      <symbol id="i-minus" viewBox="0 0 24 24"><path d="M6 12h12"/></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"/></symbol>
+      <symbol id="i-area" viewBox="0 0 24 24"><rect x="4.5" y="5.5" width="15" height="13" rx="1.5" stroke-dasharray="3 2.4"/></symbol>
+      <symbol id="i-note" viewBox="0 0 24 24"><path d="M5 4.5h14v10l-5 5H5z"/><path d="M14 19.5v-5h5"/><path d="M8.5 9h7M8.5 12.5h4"/></symbol>
+      <symbol id="i-panel" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M14.5 4.5v15"/><path d="M16.8 8.5h1.7M16.8 11.5h1.7"/></symbol>
+      <symbol id="i-expand" viewBox="0 0 24 24"><path d="M4.5 9V4.5H9M15 4.5h4.5V9M19.5 15v4.5H15M9 19.5H4.5V15"/></symbol>
+      <symbol id="i-shrink" viewBox="0 0 24 24"><path d="M9 4.5V9H4.5M19.5 9H15V4.5M15 19.5V15h4.5M4.5 15H9v4.5"/></symbol>
+      <symbol id="i-sync" viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 0 1-13.2 4.9M4.5 12a7.5 7.5 0 0 1 13.2-4.9"/><path d="M18 3.5v3.8h-3.8M6 20.5v-3.8h3.8"/></symbol>
+      <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3.5v2.2M12 18.3v2.2M3.5 12h2.2M18.3 12h2.2M6 6l1.6 1.6M16.4 16.4L18 18M6 18l1.6-1.6M16.4 7.6L18 6"/></symbol>
+      <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15.5V4.5M7.5 9L12 4.5 16.5 9"/><path d="M4.5 15v4.5h15V15"/></symbol>
+      <symbol id="i-close" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
+      <symbol id="i-book" viewBox="0 0 24 24"><path d="M5 4.5h10.5a3 3 0 0 1 3 3v12H8a3 3 0 0 1-3-3z"/><path d="M5 16.5a3 3 0 0 1 3-3h10.5"/></symbol>
+    </defs>
+  </svg>
+
+  <!-- ============================== Setup ============================== -->
+  <section id="view-setup" class="view view-page" hidden>
+    <div class="setup-card">
+      <div class="brand"><svg class="brand-mark"><use href="#i-book"/></svg><span>Learn Reader</span></div>
+      <h1>Collega il tuo repository</h1>
+      <p class="lead">I PDF e le annotazioni restano nel tuo repository GitHub privato. Le evidenziazioni si salvano subito su questo dispositivo e poi si sincronizzano da sole.</p>
+      <form id="setup-form" autocomplete="off">
+        <label class="field">
+          <span>Repository</span>
+          <input name="repo" value="Perruccio/Learn" required pattern="[^\/\s]+\/[^\/\s]+" spellcheck="false" autocapitalize="off">
+        </label>
+        <label class="field">
+          <span>Branch</span>
+          <input name="branch" value="main" required spellcheck="false" autocapitalize="off">
+        </label>
+        <label class="field">
+          <span>Token GitHub</span>
+          <input name="token" type="password" required spellcheck="false" autocapitalize="off" placeholder="github_pat_…">
+        </label>
+        <details class="howto">
+          <summary>Come si crea il token</summary>
+          <ol>
+            <li>Apri <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">GitHub → Fine-grained tokens → Generate new token</a>.</li>
+            <li><b>Repository access</b>: <i>Only select repositories</i> → scegli solo il repository dei PDF.</li>
+            <li><b>Permissions → Repository permissions → Contents</b>: <i>Read and write</i>.</li>
+            <li>Scegli la scadenza, genera il token e incollalo qui.</li>
+          </ol>
+          <p>Il token resta solo nel browser di questo dispositivo e può leggere e scrivere soltanto quel repository.</p>
+        </details>
+        <p id="setup-error" class="form-error" role="alert" hidden></p>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary" id="setup-submit">Connetti</button>
+          <button type="button" class="btn btn-ghost" id="setup-cancel" hidden>Annulla</button>
+          <button type="button" class="btn btn-ghost btn-danger-text" id="setup-logout" hidden>Disconnetti questo dispositivo</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- ============================== Library ============================== -->
+  <section id="view-library" class="view view-page" hidden>
+    <header class="lib-header">
+      <div class="brand"><svg class="brand-mark"><use href="#i-book"/></svg><span>Learn Reader</span></div>
+      <div class="lib-actions">
+        <button type="button" class="sync-pill" data-sync-pill title="Sincronizza ora"><svg class="icon"><use href="#i-sync"/></svg><span class="sync-text">Sincronizzato</span></button>
+        <button type="button" class="icon-btn" id="btn-upload" title="Aggiungi PDF" aria-label="Aggiungi PDF"><svg class="icon"><use href="#i-upload"/></svg></button>
+        <a class="icon-btn" href="#setup" title="Impostazioni" aria-label="Impostazioni"><svg class="icon"><use href="#i-gear"/></svg></a>
+      </div>
+    </header>
+    <main class="lib-main">
+      <div class="lib-tools">
+        <input type="search" id="lib-search" placeholder="Cerca un libro…" aria-label="Cerca un libro">
+        <span class="lib-repo" id="lib-repo"></span>
+      </div>
+      <p id="library-offline" class="notice" hidden>Sei offline: mostro la libreria salvata. I libri già aperti sono leggibili.</p>
+      <div id="library-list" class="lib-list"></div>
+    </main>
+    <input type="file" id="upload-input" accept="application/pdf,.pdf" multiple hidden>
+    <dialog id="upload-dialog" class="dialog">
+      <form method="dialog" id="upload-form">
+        <h2>Aggiungi PDF al repository</h2>
+        <p id="upload-files" class="muted"></p>
+        <label class="field">
+          <span>Cartella</span>
+          <input name="folder" list="upload-folders" value="matematica/libri" spellcheck="false" autocapitalize="off">
+          <datalist id="upload-folders"></datalist>
+        </label>
+        <p class="muted small">Massimo 95 MB per file. Il caricamento può richiedere qualche minuto.</p>
+        <div class="form-actions">
+          <button value="ok" class="btn btn-primary">Carica</button>
+          <button value="cancel" class="btn btn-ghost" formnovalidate>Annulla</button>
+        </div>
+      </form>
+    </dialog>
+  </section>
+
+  <!-- ============================== Reader ============================== -->
+  <section id="view-reader" class="view" data-mode="select" hidden>
+    <header class="toolbar">
+      <div class="tb-group tb-left">
+        <button type="button" class="icon-btn" id="btn-back" title="Libreria" aria-label="Torna alla libreria"><svg class="icon"><use href="#i-back"/></svg></button>
+        <span class="reader-title" id="reader-title"></span>
+      </div>
+      <div class="tb-group tb-center">
+        <button type="button" class="icon-btn hide-narrow" id="page-prev" aria-label="Pagina precedente"><svg class="icon"><use href="#i-left"/></svg></button>
+        <label class="page-box"><input id="page-input" type="text" inputmode="numeric" aria-label="Pagina" value="1"><span class="page-sep">/</span><span id="page-total">–</span></label>
+        <button type="button" class="icon-btn hide-narrow" id="page-next" aria-label="Pagina successiva"><svg class="icon"><use href="#i-right"/></svg></button>
+        <span class="tb-divider hide-narrow"></span>
+        <button type="button" class="icon-btn hide-narrow" id="zoom-out" aria-label="Riduci"><svg class="icon"><use href="#i-minus"/></svg></button>
+        <select id="zoom-select" class="zoom-select hide-narrow" aria-label="Zoom">
+          <option value="auto">Automatico</option>
+          <option value="page-width">Larghezza</option>
+          <option value="page-fit">Pagina intera</option>
+          <option value="0.75">75%</option>
+          <option value="1">100%</option>
+          <option value="1.25">125%</option>
+          <option value="1.5">150%</option>
+          <option value="2">200%</option>
+          <option value="3">300%</option>
+          <option value="custom" id="zoom-custom" hidden>—</option>
+        </select>
+        <button type="button" class="icon-btn hide-narrow" id="zoom-in" aria-label="Ingrandisci"><svg class="icon"><use href="#i-plus"/></svg></button>
+      </div>
+      <div class="tb-group tb-right">
+        <button type="button" class="icon-btn" data-tool="area" aria-pressed="false" title="Evidenzia un'area (per PDF scansionati e formule)" aria-label="Evidenzia area"><svg class="icon"><use href="#i-area"/></svg></button>
+        <button type="button" class="icon-btn" data-tool="note" aria-pressed="false" title="Aggiungi una nota sulla pagina" aria-label="Aggiungi nota"><svg class="icon"><use href="#i-note"/></svg></button>
+        <span class="tool-colors hide-narrow" id="tool-colors" role="group" aria-label="Colore"></span>
+        <span class="tb-divider hide-narrow"></span>
+        <button type="button" class="icon-btn" id="btn-panel" title="Annotazioni, indice, cerca" aria-label="Pannello"><svg class="icon"><use href="#i-panel"/></svg><span class="badge" id="annotation-count"></span></button>
+        <button type="button" class="sync-pill compact" data-sync-pill title="Sincronizza ora"><svg class="icon"><use href="#i-sync"/></svg><span class="sync-text">Sincronizzato</span></button>
+        <button type="button" class="icon-btn" id="btn-fullscreen" title="Schermo intero (F)" aria-label="Schermo intero"><svg class="icon"><use href="#i-expand"/></svg></button>
+      </div>
+    </header>
+
+    <div id="viewerContainer">
+      <div id="viewer" class="pdfViewer"></div>
+    </div>
+
+    <div id="reader-loading" class="reader-loading" hidden>
+      <div class="loading-card">
+        <p id="reader-loading-text">Apro il libro…</p>
+        <div id="reader-loading-bar" class="progress" hidden><span></span></div>
+        <a href="#" class="btn btn-ghost loading-back">Torna alla libreria</a>
+      </div>
+    </div>
+
+    <p id="tool-hint" class="tool-hint" hidden></p>
+
+    <button type="button" id="btn-exit-immersive" class="exit-immersive" hidden aria-label="Esci da schermo intero"><svg class="icon"><use href="#i-shrink"/></svg></button>
+
+    <aside id="panel" class="panel" hidden>
+      <div class="panel-head">
+        <div class="tabs" role="tablist">
+          <button type="button" role="tab" data-panel-tab="notes" aria-selected="true">Annotazioni</button>
+          <button type="button" role="tab" data-panel-tab="outline" aria-selected="false">Indice</button>
+          <button type="button" role="tab" data-panel-tab="search" aria-selected="false">Cerca</button>
+        </div>
+        <button type="button" class="icon-btn" id="panel-close" aria-label="Chiudi pannello"><svg class="icon"><use href="#i-close"/></svg></button>
+      </div>
+      <div class="panel-body" data-panel-body="notes">
+        <p id="ann-empty" class="panel-empty">Nessuna annotazione. Seleziona del testo per evidenziarlo, oppure usa gli strumenti Area e Nota.</p>
+        <ul id="ann-list" class="ann-list"></ul>
+      </div>
+      <div class="panel-body" data-panel-body="outline" hidden>
+        <p id="outline-empty" class="panel-empty" hidden>Questo PDF non ha un indice.</p>
+        <nav id="outline" class="outline"></nav>
+      </div>
+      <div class="panel-body" data-panel-body="search" hidden>
+        <form id="find-form" class="find-form">
+          <input type="search" id="find-input" placeholder="Cerca nel libro…" aria-label="Cerca nel libro" enterkeyhint="search">
+          <button type="button" class="icon-btn" id="find-prev" aria-label="Risultato precedente"><svg class="icon"><use href="#i-left"/></svg></button>
+          <button type="button" class="icon-btn" id="find-next" aria-label="Risultato successivo"><svg class="icon"><use href="#i-right"/></svg></button>
+        </form>
+        <p id="find-status" class="find-status"></p>
+      </div>
+    </aside>
+
+    <div id="selection-bar" class="selection-bar" hidden>
+      <span class="sel-label">Evidenzia</span>
+      <span class="sel-colors"></span>
+      <span class="tb-divider"></span>
+      <button type="button" class="btn btn-small" id="sel-note">+ Nota</button>
+      <button type="button" class="icon-btn" id="sel-cancel" aria-label="Annulla selezione"><svg class="icon"><use href="#i-close"/></svg></button>
+    </div>
+
+    <div id="popover" class="popover" role="dialog" aria-label="Annotazione" hidden>
+      <div class="pop-head">
+        <span id="pop-meta" class="pop-meta"></span>
+        <span class="pop-colors"></span>
+        <button type="button" class="icon-btn" id="pop-close" aria-label="Chiudi"><svg class="icon"><use href="#i-close"/></svg></button>
+      </div>
+      <blockquote id="pop-quote" class="pop-quote" hidden></blockquote>
+      <textarea id="pop-note" class="pop-note" rows="3" placeholder="Scrivi una nota…"></textarea>
+      <div class="pop-foot">
+        <button type="button" class="btn btn-ghost btn-danger-text" id="pop-delete">Elimina</button>
+        <button type="button" class="btn btn-primary" id="pop-done">Fatto</button>
+      </div>
+    </div>
+  </section>
+
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
