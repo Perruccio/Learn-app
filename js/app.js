@@ -290,6 +290,11 @@ function bindUpload() {
         toast(`${file.name}: troppo grande (massimo 95 MB)`, { error: true, ms: 6000 });
         continue;
       }
+      const head = new Uint8Array(await file.slice(0, 5).arrayBuffer());
+      if (String.fromCharCode(...head) !== '%PDF-') {
+        toast(`${file.name}: non è un PDF valido`, { error: true, ms: 6000 });
+        continue;
+      }
       const name = safeName(file.name).replace(/(\.pdf)?$/i, '.pdf');
       const path = folder ? `${folder}/${name}` : name;
       const existing = app.files?.find((f) => f.path === path);

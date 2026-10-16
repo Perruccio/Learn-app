@@ -20,14 +20,61 @@ export function emptyDoc(book) {
   return { version: DOC_VERSION, book, lastPage: null, annotations: {} };
 }
 
+const COLORS = new Set(['yellow', 'green', 'blue', 'pink']);
+const TYPES = new Set(['highlight', 'area', 'note']);
+const MAX_PAGE = 100000;
+
+const finiteOr = (v, fallback) => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
+const inUnit = (v) => typeof v === 'number' && Number.isFinite(v) && v >= -0.01 && v <= 1.01;
+
+/**
+ * Whitelist-based validation of one annotation. Anything read from storage or
+ * from the repository is untrusted: unknown keys are dropped, enums are
+ * checked, geometry must be numeric, strings are length-capped.
+ */
+export function sanitizeAnnotation(a) {
+  if (!a || typeof a !== 'object') return null;
+  if (typeof a.id !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(a.id)) return null;
+  if (!Number.isInteger(a.page) || a.page < 1 || a.page > MAX_PAGE) return null;
+  const out = {
+    id: a.id,
+    type: TYPES.has(a.type) ? a.type : 'highlight',
+    page: a.page,
+    createdAt: finiteOr(a.createdAt, 0),
+    updatedAt: finiteOr(a.updatedAt, 0),
+  };
+  if (a.deleted === true) {
+    out.deleted = true;
+    return out;
+  }
+  out.color = COLORS.has(a.color) ? a.color : 'yellow';
+  if (typeof a.text === 'string' && a.text) out.text = a.text.slice(0, 4000);
+  if (typeof a.note === 'string') out.note = a.note.slice(0, 20000);
+  if (out.type === 'note') {
+    if (!inUnit(a.x) || !inUnit(a.y)) return null;
+    out.x = a.x;
+    out.y = a.y;
+  } else {
+    const rects = Array.isArray(a.rects)
+      ? a.rects.filter((r) => Array.isArray(r) && r.length === 4 && r.every(inUnit)).slice(0, 200)
+      : [];
+    if (!rects.length) return null;
+    out.rects = rects;
+  }
+  return out;
+}
+
 /** Normalize whatever is stored (local or remote) into the in-memory shape. */
 export function reviveDoc(raw, book) {
   const doc = emptyDoc(book);
   if (!raw || typeof raw !== 'object') return doc;
-  doc.lastPage = raw.lastPage && Number.isFinite(raw.lastPage.page) ? raw.lastPage : null;
+  const lp = raw.lastPage;
+  doc.lastPage =
+    lp && Number.isInteger(lp.page) && lp.page >= 1 && lp.page <= MAX_PAGE ? { page: lp.page, at: finiteOr(lp.at, 0) } : null;
   const list = Array.isArray(raw.annotations) ? raw.annotations : Object.values(raw.annotations || {});
-  for (const a of list) {
-    if (a && typeof a.id === 'string' && Number.isFinite(a.page)) doc.annotations[a.id] = a;
+  for (const item of list.slice(0, 50000)) {
+    const a = sanitizeAnnotation(item);
+    if (a) doc.annotations[a.id] = a;
   }
   return doc;
 }

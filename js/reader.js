@@ -185,7 +185,9 @@ export class Reader {
         cMapUrl: `${VENDOR}cmaps/`,
         cMapPacked: true,
         standardFontDataUrl: `${VENDOR}standard_fonts/`,
+        // Security: never compile code from PDF data (CVE-2024-4367 class), no XFA forms.
         isEvalSupported: false,
+        enableXfa: false,
       }).promise;
       if (this.book !== file.path) {
         pdf.destroy();
@@ -253,9 +255,13 @@ export class Reader {
 
   _createViewer() {
     if (this.viewer) return;
-    const { EventBus, PDFLinkService, PDFFindController, PDFViewer } = viewerLib;
+    const { EventBus, LinkTarget, PDFLinkService, PDFFindController, PDFViewer } = viewerLib;
     this.eventBus = new EventBus();
-    this.linkService = new PDFLinkService({ eventBus: this.eventBus });
+    this.linkService = new PDFLinkService({
+      eventBus: this.eventBus,
+      externalLinkTarget: LinkTarget.BLANK,
+      externalLinkRel: 'noopener noreferrer nofollow',
+    });
     this.findController = new PDFFindController({ eventBus: this.eventBus, linkService: this.linkService });
     this.viewer = new PDFViewer({
       container: this.container,
@@ -264,6 +270,7 @@ export class Reader {
       linkService: this.linkService,
       findController: this.findController,
       textLayerMode: 1,
+      // Links only: no form fields, and PDF JavaScript is never executed (no scripting manager).
       annotationMode: pdfjsLib.AnnotationMode.ENABLE,
       annotationEditorMode: pdfjsLib.AnnotationEditorType.DISABLE,
       imageResourcesPath: `${VENDOR}web/images/`,
@@ -591,6 +598,30 @@ export class Reader {
     };
     c.addEventListener('pointerup', finish);
     c.addEventListener('pointercancel', finish);
+
+    // External links inside a PDF: never follow silently. Show the full address and ask.
+    c.addEventListener(
+      'click',
+      (e) => {
+        const link = e.target.closest('.annotationLayer a[href]');
+        if (!link) return;
+        const href = link.getAttribute('href') || '';
+        if (href.startsWith('#')) return; // internal destination inside the book
+        e.preventDefault();
+        e.stopPropagation();
+        let url;
+        try {
+          url = new URL(href, location.href);
+        } catch {
+          return;
+        }
+        if (!['http:', 'https:', 'mailto:'].includes(url.protocol)) return;
+        if (confirm(`Il PDF contiene un link esterno:\n\n${url.href}\n\nAprirlo in una nuova scheda?`)) {
+          window.open(url.href, '_blank', 'noopener,noreferrer');
+        }
+      },
+      true,
+    );
 
     c.addEventListener('click', (e) => {
       if (this.suppressClick) {

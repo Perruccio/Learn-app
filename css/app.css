@@ -72,6 +72,7 @@ body {
 }
 body[data-view="reader"] { overflow: hidden; overscroll-behavior: none; }
 [hidden] { display: none !important; }
+.sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
 a { color: var(--accent); }
 button, input, select, textarea { font: inherit; color: inherit; }
 code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; background: var(--surface-2); padding: 0.1em 0.35em; border-radius: 5px; }
