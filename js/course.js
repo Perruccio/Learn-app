@@ -5,9 +5,9 @@
 // session, personal to-dos and the error log are stored in "<base>/stato.json"
 // (synced like annotations).
 
-import { el, dirName, toast, uid } from './util.js?v=f4bef7dc2945';
-import { loadMath, parseProgress, readText, setSessionDone } from './cards.js?v=f4bef7dc2945';
-import { joinPath, renderMarkdown } from './markdown.js?v=f4bef7dc2945';
+import { el, dirName, toast, uid } from './util.js?v=3d7374a80e17';
+import { loadMath, parseProgress, readText, setSessionDone } from './cards.js?v=3d7374a80e17';
+import { joinPath, renderMarkdown } from './markdown.js?v=3d7374a80e17';
 
 const SESSION_ID = /^[A-Z]\d{2,4}$/;
 const ID_RE = /^[a-z0-9]{4,24}$/;
@@ -261,15 +261,18 @@ export class Course {
           ),
         );
       }
+      // Documents: method pages plus every roadmap (titled by its first heading).
       const docs = [
         ['Metodo di studio', 'metodo/metodo.md'],
         ['Setup e strumenti', 'metodo/setup.md'],
         ['Risorse', 'metodo/risorse.md'],
-        ['Roadmap · Algebra lineare', 'roadmap/LA-algebra-lineare.md'],
-        ['Roadmap · Probabilità e processi', 'roadmap/PP-probabilita-processi.md'],
-        ['Roadmap · Analisi funzionale', 'roadmap/AF-analisi-funzionale.md'],
-        ['Roadmap · Statistica', 'roadmap/ST-statistica.md'],
       ].filter(([, p]) => this.file(joinPath(t.base, p)));
+      const roadmapDir = joinPath(t.base, 'roadmap');
+      const roadmaps = this.allFiles.filter((f) => dirName(f.path) === roadmapDir && /\.md$/i.test(f.path)).sort((a, b) => a.path.localeCompare(b.path));
+      for (const f of roadmaps) {
+        const h1 = (await readText(this.gh, f)).match(/^#\s+(.+)$/m);
+        docs.push([`Roadmap · ${h1 ? h1[1].trim() : f.path.split('/').pop()}`, f.path.slice(t.base ? t.base.length + 1 : 0)]);
+      }
       if (docs.length) {
         nodes.push(
           el(
