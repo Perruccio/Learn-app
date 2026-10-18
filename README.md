@@ -7,7 +7,7 @@ Lettore PDF web per studiare dai libri del repository [`Perruccio/Learn`](https:
 - ripresa dall'ultima pagina letta, su qualsiasi dispositivo;
 - sincronizzazione su GitHub: ogni modifica è salvata subito sul dispositivo e sincronizzata in background pochi secondi dopo (e quando chiudi il libro o lasci l'app). Le modifiche fatte su dispositivi diversi vengono unite, annotazione per annotazione;
 - PDF scaricati una sola volta e poi letti dalla cache del dispositivo (anche offline).
-- **Percorso e sessioni nell'app**: avanzamento complessivo e per filone, pagina di ogni sessione (Markdown con formule) con checklist derivata dalla scheda più voci personali, soluzioni su richiesta, registro errori e pulsante "Segna la sessione come fatta". Stato in `<materia>/stato.json`, sincronizzato. GitHub non serve durante lo studio.
+- **Percorso e sessioni nell'app**: avanzamento complessivo e per filone, pagina di ogni sessione (Markdown con formule) con una barra delle fasi (Ripasso · Domande · Teoria · Esercizi: un tocco sulla fase raggiunta), promemoria personali, soluzioni su richiesta, registro errori e pulsante "Segna la sessione come fatta". Stato in `<materia>/stato.json`, sincronizzato. GitHub non serve durante lo studio.
 - **Flashcard con ripetizione spaziata** (algoritmo FSRS, quello delle versioni recenti di Anki) e formule LaTeX (KaTeX). Le carte sono file `flashcard/*.tsv` nel repository privato; quelle di una sessione si sbloccano quando la sessione è segnata come fatta in `PROGRESSI.md` (anche dal pulsante **Segna come fatta** nella libreria). Lo stato del ripasso è in `flashcard/progresso.json`, sincronizzato come le annotazioni.
 
 **App:** <https://perruccio-learn.github.io/Learn-app/>

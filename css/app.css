@@ -632,3 +632,31 @@ a.check-label:hover { color: var(--accent); }
 .solutions-title { font-size: 18px; margin: 8px 0 0; }
 .solutions { display: grid; gap: 12px; }
 .md hr + h2 { border-top: 0; padding-top: 0; }
+
+/* session stepper: "where am I" */
+.stepper {
+  position: sticky; top: -18px; z-index: 5; margin: -18px 0 0; padding: 14px 0 10px;
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.steps { list-style: none; margin: 0; padding: 0; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; }
+.step button {
+  width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 44px; padding: 6px 8px; border-radius: 12px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--surface); color: var(--muted); font-weight: 600; font-size: 14px;
+}
+.step-dot {
+  flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 12px; font-weight: 700; border: 2px solid currentColor;
+}
+.step-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.step.s-done button { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.step.s-done .step-dot { border-color: transparent; background: rgba(255, 255, 255, 0.22); }
+.step.s-next button { border-color: var(--accent); color: var(--ink); }
+.step-hint { margin: 8px 2px 0; font-size: 13px; color: var(--muted); }
+.md h2.is-done { color: var(--muted); }
+.md h2.is-done::after { content: '  ✓'; color: var(--accent); }
+.todo-head { margin-top: 14px; }
+@media (max-width: 520px) {
+  .step button { flex-direction: column; gap: 3px; min-height: 58px; font-size: 12px; padding: 6px 4px; }
+}
