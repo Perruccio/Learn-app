@@ -34,8 +34,8 @@ that can write to the private repo, so:
 1. Change code.
 2. Run `python scripts/stamp.py` (cache busting; CI fails if forgotten).
 3. Run the tests: `cd tests && npm ci && PW_CHROMIUM_PATH=... node run-all.mjs`
-   (in Claude cloud sessions Chromium is at `/opt/pw-browsers/chromium/chrome-linux/chrome`
-   or `/opt/pw-browsers/chromium`; do not run `playwright install` there).
+   (in Claude cloud sessions use `PW_CHROMIUM_PATH=/opt/pw-browsers/chromium`, or
+   `/opt/pw-browsers/chromium/chrome-linux/chrome` if that is a directory layout; never run `playwright install` there).
    Optionally also against the real course: `CONTENT_DIR=/path/to/Learn node run-all.mjs review course`.
 4. Commit and push to `main`; CI (`.github/workflows/ci.yml`) tests and deploys to Pages.
    GitHub Actions are pinned to full commit SHAs.

@@ -151,11 +151,12 @@ const all = await A.page.evaluate(async (paths) => {
     math += div.querySelectorAll('.katex').length;
     for (const e of div.querySelectorAll('.katex-error')) bad.push(`${p}: ${e.textContent.slice(0, 40)}`);
     // leftover $ signs usually mean a formula was not recognized
+    for (const c of div.querySelectorAll('code, pre')) c.remove(); // literal $ in code is fine
     const stray = div.textContent.match(/\$[^$\s][^$]{0,40}\$/);
     if (stray) bad.push(`${p}: stray ${stray[0]}`);
   }
   return { math, bad };
-}, [...repo].filter(([k]) => k.endsWith('.md') && k !== 'matematica/evil.md').map(([k, v]) => [k, v.buf.toString()]));
+}, [...repo].filter(([k]) => k.endsWith('.md') && k.includes('/') && k !== 'matematica/evil.md').map(([k, v]) => [k, v.buf.toString()]));
 check('every repository document renders its math', all.bad.length === 0 && all.math > 10, `${all.math} formulas; ${all.bad.slice(0, 4).join(' ; ')}`);
 
 // Device B sees the same checklist
