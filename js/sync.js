@@ -132,6 +132,20 @@ function isEmptyDoc(doc) {
   return !doc.lastPage && Object.keys(doc.annotations).length === 0;
 }
 
+/** How annotation documents are stored, merged and written (one file per book). */
+export const annotationCodec = {
+  namespace: 'doc',
+  autoDelay: AUTO_SYNC_DELAY_MS,
+  path: annotationPath,
+  empty: emptyDoc,
+  revive: reviveDoc,
+  merge: mergeDocs,
+  serialize: serializeDoc,
+  isEmpty: isEmptyDoc,
+  toStorage: (doc) => ({ ...doc, annotations: Object.values(doc.annotations) }),
+  message: (book) => `reader: annotazioni ${prettyName(book)}`,
+};
+
 export function liveAnnotations(doc) {
   return Object.values(doc.annotations).filter((a) => !a.deleted).sort(byPosition);
 }
@@ -141,10 +155,11 @@ export function liveAnnotations(doc) {
  * status = {state: 'synced'|'pending'|'syncing'|'error'|'offline', message}
  */
 export class SyncManager extends EventTarget {
-  constructor(gh, cfg) {
+  constructor(gh, cfg, codec = annotationCodec) {
     super();
     this.gh = gh;
-    this.prefix = `learnreader:doc:${cfg.owner}/${cfg.repo}@${cfg.branch}:`;
+    this.codec = codec;
+    this.prefix = `learnreader:${codec.namespace}:${cfg.owner}/${cfg.repo}@${cfg.branch}:`;
     this.timers = new Map();
     this.running = new Map();
     this.again = new Set();
@@ -167,13 +182,13 @@ export class SyncManager extends EventTarget {
   /** Current local state of a book: {doc, dirty, rev}. */
   load(book) {
     const saved = storage.get(this.key(book), null);
-    if (!saved) return { doc: emptyDoc(book), dirty: false, rev: 0 };
-    return { doc: reviveDoc(saved.doc, book), dirty: !!saved.dirty, rev: saved.rev || 0 };
+    if (!saved) return { doc: this.codec.empty(book), dirty: false, rev: 0 };
+    return { doc: this.codec.revive(saved.doc, book), dirty: !!saved.dirty, rev: saved.rev || 0 };
   }
 
   _save(book, doc, dirty, rev) {
     const ok = storage.set(this.key(book), {
-      doc: { ...doc, annotations: Object.values(doc.annotations) },
+      doc: this.codec.toStorage(doc),
       dirty,
       rev,
     });
@@ -206,7 +221,7 @@ export class SyncManager extends EventTarget {
     return state.doc;
   }
 
-  schedule(book, delay = AUTO_SYNC_DELAY_MS) {
+  schedule(book, delay = this.codec.autoDelay) {
     clearTimeout(this.timers.get(book));
     this.timers.set(
       book,
@@ -251,24 +266,25 @@ export class SyncManager extends EventTarget {
   }
 
   async _sync(book) {
-    const path = annotationPath(book);
+    const { codec } = this;
+    const path = codec.path(book);
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       const start = this.load(book);
       const remote = await this.gh.getTextFile(path);
-      let remoteDoc = emptyDoc(book);
+      let remoteDoc = codec.empty(book);
       if (remote) {
         try {
-          remoteDoc = reviveDoc(JSON.parse(remote.text), book);
+          remoteDoc = codec.revive(JSON.parse(remote.text), book);
         } catch {
           // A corrupted remote file is replaced by the local version (git keeps the history).
         }
       }
-      const merged = mergeDocs(start.doc, remoteDoc);
-      const mergedText = serializeDoc(merged);
-      const needsPush = remote ? mergedText !== remote.text : !isEmptyDoc(merged);
+      const merged = codec.merge(start.doc, remoteDoc);
+      const mergedText = codec.serialize(merged);
+      const needsPush = remote ? mergedText !== remote.text : !codec.isEmpty(merged);
       if (needsPush) {
         try {
-          await this.gh.putFile(path, { text: mergedText }, remote?.sha, `reader: annotazioni ${prettyName(book)}`);
+          await this.gh.putFile(path, { text: mergedText }, remote?.sha, codec.message(book));
         } catch (err) {
           if (err.status === 409 || err.status === 422) continue; // someone else pushed first: retry
           throw err;
@@ -276,7 +292,7 @@ export class SyncManager extends EventTarget {
       }
       // Fold the result back, keeping edits made while the request was in flight.
       const now = this.load(book);
-      const finalDoc = mergeDocs(now.doc, merged);
+      const finalDoc = codec.merge(now.doc, merged);
       const stillDirty = now.rev !== start.rev;
       this._save(book, finalDoc, stillDirty, now.rev);
       this._emit(book, finalDoc, true);

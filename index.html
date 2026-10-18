@@ -4,8 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <!-- Strict CSP: only this site's own scripts run; the only network peer is the GitHub API.
-       Any script a malicious PDF might try to inject is blocked by the browser. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; worker-src 'self'; connect-src 'self' https://api.github.com; img-src 'self' data: blob:; style-src 'self'; font-src 'self' data:; manifest-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; frame-src 'none'">
+       Any script a malicious PDF might try to inject is blocked by the browser.
+       style-src-attr allows inline style attributes only (needed by KaTeX for formulas); they cannot run code. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; worker-src 'self'; connect-src 'self' https://api.github.com; img-src 'self' data: blob:; style-src 'self'; style-src-attr 'unsafe-inline'; font-src 'self' data:; manifest-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; frame-src 'none'">
   <meta name="referrer" content="no-referrer">
   <title>Learn Reader</title>
   <meta name="description" content="Lettore PDF con evidenziazioni e note sincronizzate su GitHub.">
@@ -19,6 +20,7 @@
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="vendor/pdfjs/web/pdf_viewer.css">
+  <link rel="stylesheet" href="vendor/katex/katex.min.css">
   <link rel="stylesheet" href="css/app.css">
 </head>
 <body data-view="">
@@ -38,6 +40,9 @@
       <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3.5v2.2M12 18.3v2.2M3.5 12h2.2M18.3 12h2.2M6 6l1.6 1.6M16.4 16.4L18 18M6 18l1.6-1.6M16.4 7.6L18 6"/></symbol>
       <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15.5V4.5M7.5 9L12 4.5 16.5 9"/><path d="M4.5 15v4.5h15V15"/></symbol>
       <symbol id="i-close" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
+      <symbol id="i-cards" viewBox="0 0 24 24"><rect x="6.5" y="3.5" width="13" height="16" rx="2"/><path d="M4.5 7v11.5a2 2 0 0 0 2 2H15"/><path d="M10 9.5h6M10 13h4"/></symbol>
+      <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 7.5L5 11.5l4 4"/><path d="M5 11.5h9.5a4.5 4.5 0 0 1 0 9H12"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
       <symbol id="i-book" viewBox="0 0 24 24"><path d="M5 4.5h10.5a3 3 0 0 1 3 3v12H8a3 3 0 0 1-3-3z"/><path d="M5 16.5a3 3 0 0 1 3-3h10.5"/></symbol>
     </defs>
   </svg>
@@ -96,6 +101,25 @@
         <input type="search" id="lib-search" placeholder="Cerca un libro…" aria-label="Cerca un libro">
         <span class="lib-repo" id="lib-repo"></span>
       </div>
+      <section class="home-panels">
+        <div class="panel-card" id="next-session" hidden>
+          <div class="panel-card-head"><span class="eyebrow">Prossima sessione</span></div>
+          <p class="next-title" id="next-title"></p>
+          <p class="muted small" id="next-meta"></p>
+          <div class="panel-actions">
+            <a class="btn" id="next-open" target="_blank" rel="noopener noreferrer">Apri la scheda</a>
+            <button type="button" class="btn btn-ghost" id="next-done"><svg class="icon"><use href="#i-check"/></svg>Segna come fatta</button>
+          </div>
+        </div>
+        <div class="panel-card" id="review-panel" hidden>
+          <div class="panel-card-head"><span class="eyebrow">Flashcard</span></div>
+          <p class="review-counts"><span class="big" id="rv-due">0</span> da ripassare <span class="sep">·</span> <span class="big" id="rv-new">0</span> nuove</p>
+          <p class="muted small" id="rv-decks"></p>
+          <div class="panel-actions">
+            <a class="btn btn-primary" id="rv-start" href="#ripasso"><svg class="icon"><use href="#i-cards"/></svg>Inizia ripasso</a>
+          </div>
+        </div>
+      </section>
       <p id="library-offline" class="notice" hidden>Sei offline: mostro la libreria salvata. I libri già aperti sono leggibili.</p>
       <div id="library-list" class="lib-list"></div>
     </main>
@@ -116,6 +140,40 @@
         </div>
       </form>
     </dialog>
+  </section>
+
+  <!-- ============================== Review ============================== -->
+  <section id="view-review" class="view" hidden>
+    <header class="toolbar review-toolbar">
+      <div class="tb-group tb-left">
+        <button type="button" class="icon-btn" id="review-back" title="Libreria" aria-label="Torna alla libreria"><svg class="icon"><use href="#i-back"/></svg></button>
+        <span class="reader-title">Ripasso</span>
+      </div>
+      <div class="tb-group tb-center"><span class="review-count" id="review-count"></span></div>
+      <div class="tb-group tb-right">
+        <button type="button" class="icon-btn" id="review-undo" title="Annulla l'ultima risposta (Z)" aria-label="Annulla l'ultima risposta"><svg class="icon"><use href="#i-undo"/></svg></button>
+        <button type="button" class="sync-pill compact" data-sync-pill title="Sincronizza ora"><svg class="icon"><use href="#i-sync"/></svg><span class="sync-text">Sincronizzato</span></button>
+      </div>
+    </header>
+    <main class="review-main">
+      <div id="review-stage" class="review-stage">
+        <article id="review-card" class="review-card" aria-live="polite">
+          <p class="review-meta" id="review-meta"></p>
+          <div class="review-front" id="review-front"></div>
+          <hr class="review-divider" id="review-divider" hidden>
+          <div class="review-back" id="review-back-text" hidden></div>
+        </article>
+        <div class="review-actions">
+          <button type="button" class="btn btn-primary btn-wide" id="review-show">Mostra risposta <kbd>Spazio</kbd></button>
+          <div class="review-ratings" id="review-ratings" hidden></div>
+        </div>
+      </div>
+      <div id="review-done" class="review-done" hidden>
+        <svg class="done-mark"><use href="#i-check"/></svg>
+        <p id="review-done-text"></p>
+        <button type="button" class="btn btn-primary" id="review-finish">Torna alla libreria</button>
+      </div>
+    </main>
   </section>
 
   <!-- ============================== Reader ============================== -->

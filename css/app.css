@@ -455,3 +455,77 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
   .sync-pill { padding: 0 9px; }
   .selection-bar { left: 12px; right: 12px; transform: none; justify-content: space-between; }
 }
+
+/* ------------------------------------------------------------------ home panels */
+
+.home-panels { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); margin-bottom: 24px; }
+.panel-card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px;
+  display: grid; gap: 6px; align-content: start;
+}
+.eyebrow { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 650; }
+.next-title { margin: 2px 0 0; font-weight: 620; font-size: 16px; line-height: 1.3; }
+.panel-card p { margin: 0; }
+.panel-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.panel-actions .icon { width: 18px; height: 18px; }
+.review-counts { color: var(--muted); }
+.review-counts .big { font-size: 26px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.review-counts .sep { margin: 0 4px; }
+.btn.is-disabled { opacity: 0.55; }
+
+/* ------------------------------------------------------------------ review */
+
+#view-review { position: fixed; inset: 0; background: var(--bg); display: flex; flex-direction: column; }
+#view-review .toolbar { position: relative; flex: none; }
+.review-count { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.review-main {
+  flex: 1; min-height: 0; overflow: auto; display: flex; justify-content: center;
+  padding: 20px 16px calc(16px + var(--safe-bottom));
+}
+.review-stage { width: 100%; max-width: 720px; display: flex; flex-direction: column; gap: 16px; min-height: 100%; }
+.review-card {
+  flex: 0 0 auto; min-height: min(260px, 40vh); background: var(--surface); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow);
+  padding: clamp(18px, 4vw, 36px); cursor: pointer; overflow-wrap: anywhere;
+  font-size: clamp(17px, 2.2vw, 20px); line-height: 1.55;
+}
+.review-meta { margin: 0 0 14px; font-size: 12px; color: var(--muted); font-weight: 650; text-transform: uppercase; letter-spacing: 0.06em; }
+.review-front { font-weight: 560; }
+.review-back { color: var(--ink); }
+.review-divider { border: 0; border-top: 1px dashed var(--line); margin: 20px 0; }
+.review-card .math-display { margin: 0.6em 0; overflow-x: auto; overflow-y: hidden; padding: 2px 0; }
+.review-card .katex { font-size: 1.08em; }
+.review-card code { font-size: 0.9em; }
+.review-actions { flex: none; display: grid; gap: 10px; margin-top: auto; position: sticky; bottom: 0; padding-top: 8px; background: linear-gradient(transparent, var(--bg) 30%); }
+.btn-wide { width: 100%; min-height: 52px; font-size: 16px; }
+.btn kbd {
+  font: 600 11px/1 ui-monospace, monospace; padding: 3px 5px; border-radius: 4px;
+  background: rgba(255, 255, 255, 0.2); margin-left: 6px;
+}
+.review-ratings { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.rate {
+  display: grid; gap: 2px; justify-items: center; padding: 10px 4px; min-height: 58px; border-radius: 12px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+}
+.rate:hover { filter: brightness(0.97); }
+.rate-label { font-weight: 650; font-size: 15px; }
+.rate-ivl { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.rate-again { border-color: #e5a3a3; }
+.rate-again .rate-label { color: #b4232c; }
+.rate-hard .rate-label { color: #a76a00; }
+.rate-good { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+.rate-good .rate-label { color: var(--accent); }
+.rate-easy .rate-label { color: #1d6fc9; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .rate-again .rate-label { color: #ff8a8a; }
+  :root:not([data-theme="light"]) .rate-hard .rate-label { color: #f0b44c; }
+  :root:not([data-theme="light"]) .rate-easy .rate-label { color: #7db6ff; }
+  :root:not([data-theme="light"]) .rate-again { border-color: #6b3535; }
+}
+.review-done { align-self: center; display: grid; justify-items: center; gap: 14px; text-align: center; padding: 40px 16px; }
+.review-done p { font-size: 18px; margin: 0; }
+.done-mark { width: 56px; height: 56px; fill: none; stroke: var(--accent); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+@media (max-width: 720px) {
+  .rate { min-height: 62px; }
+  .rate-label { font-size: 14px; }
+  .btn kbd { display: none; }
+}
