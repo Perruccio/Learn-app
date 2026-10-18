@@ -1,0 +1,6 @@
+#separator:tab
+#html:true
+#deck:Test::PP
+#tags column:3
+Subadditività?	\(P(A \cup B) \le P(A) + P(B)\)	S002 PP
+Varianza di una Bernoulli\((p)\)?	\[p(1-p)\]	S002 PP

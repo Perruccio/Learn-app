@@ -75,3 +75,13 @@ python -m http.server 8000   # poi apri http://localhost:8000
 ```
 
 Prima di ogni commit: `python scripts/stamp.py`. Aggiunge una versione ricavata dal contenuto (`?v=…`) a moduli e fogli di stile e aggiorna `version.json`. GitHub Pages fa tenere i file in cache per circa 10 minuti: con la versione, i browser caricano subito il codice nuovo e l'app aperta si accorge da sola dell'aggiornamento.
+
+### Test
+
+Test end-to-end con Playwright in `tests/` (dettagli in [`tests/README.md`](tests/README.md)): reader, sicurezza (PDF e markdown ostili, CSP), ripasso, pagine del corso, aggiornamento automatico. L'API di GitHub è simulata e i contenuti sono sintetici (`tests/fixtures/`): nel repo pubblico non entra niente del repo privato.
+
+```bash
+cd tests && npm ci && npx playwright install chromium && npm test
+```
+
+La CI (`.github/workflows/ci.yml`) esegue i test a ogni push e pull request e pubblica su GitHub Pages solo da `main` e solo se i test passano. Controlla anche che `scripts/stamp.py` sia stato eseguito. Le action sono fissate a commit SHA.
