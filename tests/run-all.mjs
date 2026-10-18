@@ -5,7 +5,7 @@ import path from 'path';
 import { serve } from './serve.mjs';
 
 const HERE = path.dirname(new URL(import.meta.url).pathname);
-const ALL = ['reader', 'security', 'review', 'course', 'update', 'perf'];
+const ALL = ['reader', 'security', 'upload', 'review', 'course', 'update', 'perf'];
 const suites = process.argv.slice(2).length ? process.argv.slice(2) : ALL;
 const server = process.env.APP_URL ? null : await serve();
 

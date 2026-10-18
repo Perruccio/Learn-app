@@ -1,6 +1,6 @@
 // Minimal GitHub REST client for a single repository (contents, trees, blobs).
 
-import { b64decodeUtf8, b64encodeUtf8 } from './util.js?v=3d7374a80e17';
+import { b64decodeUtf8, b64encodeUtf8 } from './util.js?v=ddb71df778fc';
 
 const API = 'https://api.github.com';
 
@@ -131,5 +131,29 @@ export class GitHub {
     };
     const res = await this.request(`${this.repoPath}/contents/${encodePath(path)}`, { method: 'PUT', body, keepalive });
     return res.json();
+  }
+
+  /**
+   * Create or replace a large binary file through the Git Data API (blob, tree, commit, ref).
+   * The contents endpoint rejects big payloads ("too large to be processed"); blobs accept
+   * files up to GitHub's 100 MB limit. Retries if someone else pushed in the meantime.
+   */
+  async putLargeFile(path, base64, message) {
+    const post = async (endpoint, body) => (await this.request(`${this.repoPath}/git/${endpoint}`, { method: 'POST', body })).json();
+    const blob = await post('blobs', { content: base64, encoding: 'base64' });
+    const ref = `heads/${this.branch.split('/').map(encodeURIComponent).join('/')}`;
+    for (let attempt = 0; ; attempt++) {
+      const head = await (await this.request(`${this.repoPath}/git/ref/${ref}`)).json();
+      const parent = await (await this.request(`${this.repoPath}/git/commits/${head.object.sha}`)).json();
+      const tree = await post('trees', { base_tree: parent.tree.sha, tree: [{ path, mode: '100644', type: 'blob', sha: blob.sha }] });
+      const commit = await post('commits', { message, tree: tree.sha, parents: [head.object.sha] });
+      try {
+        await this.request(`${this.repoPath}/git/refs/${ref}`, { method: 'PATCH', body: { sha: commit.sha, force: false } });
+        return { sha: blob.sha, commit: commit.sha };
+      } catch (err) {
+        // 422: the branch moved (not a fast-forward). Rebuild on the new head.
+        if (err.status !== 422 || attempt >= 3) throw err;
+      }
+    }
   }
 }

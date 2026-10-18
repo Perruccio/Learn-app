@@ -1,15 +1,15 @@
 // App shell: configuration, routing, library and sync triggers.
 
-import { $, el, debounce, dirName, formatSize, prettyName, storage, toast } from './util.js?v=3d7374a80e17';
-import { GitHub } from './github.js?v=3d7374a80e17';
-import { SyncManager, liveAnnotations } from './sync.js?v=3d7374a80e17';
-import { Reader, isPdfCached } from './reader.js?v=3d7374a80e17';
-import { loadDecks, loadMath, progressCodec, tickSession } from './cards.js?v=3d7374a80e17';
-import { ReviewSession, summarize } from './review.js?v=3d7374a80e17';
-import { Course, stateCodec } from './course.js?v=3d7374a80e17';
+import { $, el, debounce, dirName, formatSize, prettyName, storage, toast } from './util.js?v=ddb71df778fc';
+import { GitHub } from './github.js?v=ddb71df778fc';
+import { SyncManager, liveAnnotations } from './sync.js?v=ddb71df778fc';
+import { Reader, isPdfCached } from './reader.js?v=ddb71df778fc';
+import { loadDecks, loadMath, progressCodec, tickSession } from './cards.js?v=ddb71df778fc';
+import { ReviewSession, summarize } from './review.js?v=ddb71df778fc';
+import { Course, stateCodec } from './course.js?v=ddb71df778fc';
 
 // Stamped by scripts/stamp.py on every release (do not edit by hand).
-const APP_VERSION = '3d7374a80e17';
+const APP_VERSION = 'ddb71df778fc';
 const CONFIG_KEY = 'learnreader:config';
 const MAX_UPLOAD_BYTES = 95 * 1024 * 1024;
 
@@ -474,6 +474,11 @@ function bindUpload() {
   dialog.addEventListener('close', async () => {
     if (dialog.returnValue !== 'ok') return;
     const folder = $('#upload-form').folder.value.trim().replace(/^\/+|\/+$/g, '');
+    if (folder.split('/').some((s) => s === '.' || s === '..' || (folder && !s))) {
+      toast(`Cartella non valida: ${folder}`, { error: true, ms: 6000 });
+      app.uploadQueue = [];
+      return;
+    }
     for (const file of app.uploadQueue) {
       if (file.size > MAX_UPLOAD_BYTES) {
         toast(`${file.name}: troppo grande (massimo 95 MB)`, { error: true, ms: 6000 });
@@ -490,7 +495,7 @@ function bindUpload() {
       if (existing && !confirm(`${path} esiste già. Sostituirlo?`)) continue;
       toast(`Carico ${name}…`, { ms: 5000 });
       try {
-        await app.gh.putFile(path, { base64: await readAsBase64(file) }, existing?.sha, `reader: aggiunto ${name}`);
+        await app.gh.putLargeFile(path, await readAsBase64(file), `reader: aggiunto ${name}`);
         toast(`${name} caricato`);
       } catch (err) {
         toast(`${name}: ${err.message}`, { error: true, ms: 8000 });
