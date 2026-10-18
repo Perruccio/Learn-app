@@ -1,13 +1,15 @@
 // App shell: configuration, routing, library and sync triggers.
 
-import { $, el, debounce, dirName, formatSize, prettyName, storage, toast } from './util.js';
-import { GitHub } from './github.js';
-import { SyncManager, liveAnnotations } from './sync.js';
-import { Reader, isPdfCached } from './reader.js';
-import { loadDecks, loadMath, progressCodec, tickSession } from './cards.js';
-import { ReviewSession, summarize } from './review.js';
-import { Course, stateCodec } from './course.js';
+import { $, el, debounce, dirName, formatSize, prettyName, storage, toast } from './util.js?v=f4bef7dc2945';
+import { GitHub } from './github.js?v=f4bef7dc2945';
+import { SyncManager, liveAnnotations } from './sync.js?v=f4bef7dc2945';
+import { Reader, isPdfCached } from './reader.js?v=f4bef7dc2945';
+import { loadDecks, loadMath, progressCodec, tickSession } from './cards.js?v=f4bef7dc2945';
+import { ReviewSession, summarize } from './review.js?v=f4bef7dc2945';
+import { Course, stateCodec } from './course.js?v=f4bef7dc2945';
 
+// Stamped by scripts/stamp.py on every release (do not edit by hand).
+const APP_VERSION = 'f4bef7dc2945';
 const CONFIG_KEY = 'learnreader:config';
 const MAX_UPLOAD_BYTES = 95 * 1024 * 1024;
 
@@ -553,6 +555,7 @@ function bindGlobal() {
     app.cards.syncAll();
     app.state.syncAll();
   });
+  document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && checkForUpdate());
   window.addEventListener('online', () => {
     app.sync?.syncAll();
     app.cards?.syncAll();
@@ -564,6 +567,43 @@ function bindGlobal() {
   };
   document.addEventListener('fullscreenchange', onFullscreen);
   document.addEventListener('webkitfullscreenchange', onFullscreen);
+}
+
+// ------------------------------------------------------------------ updates
+
+let lastUpdateCheck = 0;
+
+/**
+ * GitHub Pages lets browsers cache files for ~10 minutes. If a newer version is
+ * deployed, refresh the cached page and reload: immediately when nothing is in
+ * progress, otherwise via a toast so a review or a note is never interrupted.
+ */
+async function checkForUpdate() {
+  if (APP_VERSION === 'dev' || Date.now() - lastUpdateCheck < 60000) return;
+  lastUpdateCheck = Date.now();
+  try {
+    const res = await fetch(`version.json?t=${Date.now()}`, { cache: 'no-store' });
+    if (!res.ok) return;
+    const { version } = await res.json();
+    if (typeof version !== 'string' || version === APP_VERSION) return;
+    await Promise.allSettled([fetch('./', { cache: 'reload' }), fetch('index.html', { cache: 'reload' })]);
+    const busy = ['reader', 'review'].includes(document.body.dataset.view) || document.activeElement?.matches?.('input, textarea');
+    // Reload automatically at most once per version (no loop if a CDN still serves the old page).
+    let alreadyTried = false;
+    try {
+      alreadyTried = sessionStorage.getItem('learnreader:reloaded-for') === version;
+      if (!busy && !alreadyTried) sessionStorage.setItem('learnreader:reloaded-for', version);
+    } catch {
+      alreadyTried = true;
+    }
+    if (!busy && !alreadyTried) {
+      location.reload();
+      return;
+    }
+    toast('È disponibile una nuova versione dell\'app.', { ms: 600000, action: { label: 'Aggiorna', fn: () => location.reload() } });
+  } catch {
+    /* offline: try again later */
+  }
 }
 
 // ------------------------------------------------------------------ start
@@ -585,3 +625,4 @@ if (saved) {
   app.state.syncAll();
 }
 route();
+checkForUpdate();

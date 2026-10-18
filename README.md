@@ -73,3 +73,5 @@ Sito statico, senza build: HTML, CSS e moduli JavaScript in `js/`. Librerie incl
 ```bash
 python -m http.server 8000   # poi apri http://localhost:8000
 ```
+
+Prima di ogni commit: `python scripts/stamp.py`. Aggiunge una versione ricavata dal contenuto (`?v=…`) a moduli e fogli di stile e aggiorna `version.json`. GitHub Pages fa tenere i file in cache per circa 10 minuti: con la versione, i browser caricano subito il codice nuovo e l'app aperta si accorge da sola dell'aggiornamento.
