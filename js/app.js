@@ -14,9 +14,40 @@ const app = { cfg: null, gh: null, sync: null, cards: null, reader: null, review
 
 // ------------------------------------------------------------------ config
 
+const SESSION_TOKEN_KEY = 'learnreader:session-token';
+
+/** Config lives in localStorage; the token too, unless the user chose "don't remember". */
 function loadConfig() {
   const c = storage.get(CONFIG_KEY);
-  return c && c.owner && c.repo && c.branch && c.token ? c : null;
+  if (!c || !c.owner || !c.repo || !c.branch) return null;
+  let token = c.token;
+  if (!token) {
+    try {
+      token = sessionStorage.getItem(SESSION_TOKEN_KEY);
+    } catch {
+      token = null;
+    }
+  }
+  return token ? { ...c, token } : null;
+}
+
+function saveConfig(cfg, remember) {
+  try {
+    sessionStorage.removeItem(SESSION_TOKEN_KEY);
+    if (!remember) sessionStorage.setItem(SESSION_TOKEN_KEY, cfg.token);
+  } catch {
+    /* ignore */
+  }
+  storage.set(CONFIG_KEY, remember ? cfg : { ...cfg, token: undefined });
+}
+
+function forgetConfig() {
+  storage.remove(CONFIG_KEY);
+  try {
+    sessionStorage.removeItem(SESSION_TOKEN_KEY);
+  } catch {
+    /* ignore */
+  }
 }
 
 function connect(cfg) {
@@ -142,7 +173,7 @@ function bindSetup() {
     error.hidden = true;
     try {
       await new GitHub(cfg).checkAccess();
-      storage.set(CONFIG_KEY, cfg);
+      saveConfig(cfg, form.remember.checked);
       connect(cfg);
       location.hash = '';
       route();
@@ -165,7 +196,7 @@ function bindSetup() {
   $('#setup-logout').addEventListener('click', () => {
     const pending = app.sync?.dirtyBooks().length || 0;
     if (pending && !confirm(`Ci sono annotazioni non ancora sincronizzate in ${pending} libri. Disconnettere comunque? Restano salvate su questo dispositivo.`)) return;
-    storage.remove(CONFIG_KEY);
+    forgetConfig();
     app.cfg = null;
     location.hash = 'setup';
     route();
@@ -510,6 +541,12 @@ function bindGlobal() {
 }
 
 // ------------------------------------------------------------------ start
+
+// Never run inside a frame: blocks clickjacking and pages that embed the app to drive it.
+if (window.top !== window.self) {
+  document.body.replaceChildren(document.createTextNode('Learn Reader non può essere aperto dentro un\'altra pagina.'));
+  throw new Error('Refusing to run in a frame');
+}
 
 bindSetup();
 bindUpload();

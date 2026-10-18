@@ -34,6 +34,25 @@ Su iPhone e Android: dal browser usa **Condividi → Aggiungi alla schermata Hom
 
 ## Sicurezza
 
+### Cosa è pubblico e cosa no
+
+Il sito e questo repository sono pubblici, ma contengono **solo codice**: nessun dato, nessun segreto. Chi apre l'app senza token vede solo la schermata di collegamento e non può leggere niente. PDF, annotazioni e flashcard stanno nel repository privato `Learn`, raggiungibile solo con il token, che resta nel browser dei tuoi dispositivi. Il fatto che il codice sia leggibile non indebolisce nulla: la sicurezza non si basa sul tenerlo nascosto.
+
+### Rischi residui e contromisure
+
+| Rischio | Contromisura |
+|---|---|
+| Furto del token tramite codice iniettato (PDF, carte, annotazioni) | CSP rigida, nessuno script esterno, contenuti validati e inseriti solo come testo (dettagli sotto) |
+| L'app incorporata in una pagina malevola (clickjacking) | L'app si rifiuta di funzionare dentro un frame |
+| Dispositivo condiviso, perso o rubato | Opzione "Ricorda su questo dispositivo" disattivabile; token con scadenza; revoca immediata su github.com → Settings → Fine-grained tokens |
+| Furto del token: danni possibili | Il token vale per **un solo** repository e solo per i contenuti: niente impostazioni, niente altri repo |
+| Altri siti GitHub Pages dello stesso account | Tutti i siti `perruccio.github.io/*` condividono la stessa origine e quindi lo stesso spazio del browser. **Non pubblicare altri siti Pages con script di terze parti**, oppure sposta l'app su un'origine dedicata (vedi sotto) |
+| Compromissione dell'account GitHub (chi la ottiene può modificare il codice dell'app) | Autenticazione a due fattori sull'account GitHub (indispensabile) |
+
+**Origine dedicata (consigliata).** Per isolare del tutto l'app, crea un'organizzazione GitHub gratuita (ad esempio `perruccio-learn`) e trasferisci lì `Learn-app`. L'app sarà su `perruccio-learn.github.io`, un'origine usata solo da lei.
+
+### Difese tecniche
+
 Un PDF è un file non fidato, quindi il reader adotta queste difese:
 
 - **Il codice dei PDF non viene mai eseguito.** PDF.js gira senza motore di scripting, con `isEvalSupported: false` (la classe di attacchi di CVE-2024-4367) e con i moduli XFA disattivati. La versione inclusa (4.10.38) non è tra quelle colpite da CVE-2026-16633 (5.6.83–6.2.107), che comunque richiede lo scripting attivo.
