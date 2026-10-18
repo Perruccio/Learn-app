@@ -5,12 +5,14 @@
 // session, personal to-dos and the error log are stored in "<base>/stato.json"
 // (synced like annotations).
 
-import { el, dirName, toast, uid } from './util.js?v=ddb71df778fc';
-import { loadMath, parseProgress, readText, setSessionDone } from './cards.js?v=ddb71df778fc';
-import { joinPath, renderMarkdown } from './markdown.js?v=ddb71df778fc';
+import { el, dirName, toast, uid } from './util.js?v=2b06f7adf1a7';
+import { loadMath, parseProgress, readText, setSessionDone } from './cards.js?v=2b06f7adf1a7';
+import { joinPath, renderMarkdown } from './markdown.js?v=2b06f7adf1a7';
 
 const SESSION_ID = /^[A-Z]\d{2,4}$/;
 const ID_RE = /^[a-z0-9]{4,24}$/;
+// Skipped topic: 'later' = recover it later, 'drop' = removed from the path, '' = not skipped.
+const SKIP_VALUES = new Set(['', 'later', 'drop']);
 const APP_BASES = [
   `${location.origin}${location.pathname}`,
   'https://perruccio-learn.github.io/Learn-app/',
@@ -31,11 +33,13 @@ function reviveState(raw, base) {
   if (!raw || typeof raw !== 'object') return doc;
   for (const [sid, s] of Object.entries(raw.sessions || {})) {
     if (!SESSION_ID.test(sid) || !s || typeof s !== 'object') continue;
-    const out = { stage: null, custom: {} };
+    const out = { stage: null, skip: null, custom: {} };
     const st = s.stage;
     if (st && Number.isInteger(st.value) && st.value >= 0 && st.value <= 20 && num(st.updatedAt)) {
       out.stage = { value: st.value, label: str(st.label, 40), updatedAt: st.updatedAt };
     }
+    const sk = s.skip;
+    if (sk && SKIP_VALUES.has(sk.value) && num(sk.updatedAt)) out.skip = { value: sk.value, updatedAt: sk.updatedAt };
     for (const [id, c] of Object.entries(s.custom || {})) {
       if (!ID_RE.test(id) || !c || !num(c.updatedAt)) continue;
       out.custom[id] = c.deleted === true
@@ -67,7 +71,7 @@ function mergeState(a, b) {
   for (const sid of new Set([...Object.keys(a.sessions), ...Object.keys(b.sessions)])) {
     const x = a.sessions[sid] || { stage: null, custom: {} };
     const y = b.sessions[sid] || { stage: null, custom: {} };
-    const s = { stage: newer(x.stage, y.stage) || null, custom: {} };
+    const s = { stage: newer(x.stage, y.stage) || null, skip: newer(x.skip, y.skip) || null, custom: {} };
     for (const k of new Set([...Object.keys(x.custom), ...Object.keys(y.custom)])) s.custom[k] = newer(x.custom[k], y.custom[k]);
     out.sessions[sid] = s;
   }
@@ -94,6 +98,11 @@ export const stateCodec = {
 };
 
 // ------------------------------------------------------------------ helpers
+
+/** How a session was skipped: 'later', 'drop' or null. */
+export function skipOf(doc, sid) {
+  return doc.sessions[sid]?.skip?.value || null;
+}
 
 function plain(markdown) {
   return markdown
@@ -198,7 +207,9 @@ export class Course {
     }
     const nodes = [];
     for (const t of tables) {
-      const rows = t.rows;
+      const state = this.state.load(t.base).doc;
+      // Topics removed from the path no longer count.
+      const rows = t.rows.filter((r) => r.done || skipOf(state, r.id) !== 'drop');
       const done = rows.filter((r) => r.done).length;
       const tracks = {};
       for (const r of rows) {
@@ -207,7 +218,6 @@ export class Course {
         tracks[k].total++;
         if (r.done) tracks[k].done++;
       }
-      const state = this.state.load(t.base).doc;
       const errorsOpen = Object.values(state.errors).filter((e) => !e.deleted && !e.card).length;
       nodes.push(
         el(
@@ -226,7 +236,7 @@ export class Course {
           errorsOpen ? el('p', { class: 'muted small' }, `${errorsOpen} errori annotati da trasformare in flashcard: chiedi a Claude «fammi le flashcard dagli errori».`) : null,
         ),
       );
-      const blocks = [...new Set(rows.map((r) => r.block))];
+      const blocks = [...new Set(t.rows.map((r) => r.block))];
       for (const b of blocks) {
         nodes.push(
           el(
@@ -236,16 +246,19 @@ export class Course {
             el(
               'ul',
               { class: 'session-list' },
-              rows
+              t.rows
                 .filter((r) => r.block === b)
                 .map((r) => {
                   const path = r.link ? joinPath(t.base, r.link) : null;
                   const available = path && this.file(path);
                   const st = this.state.load(t.base).doc.sessions[r.id];
                   const started = (st?.stage?.value || 0) > 0;
-                  const status = r.done ? 'done' : started ? 'started' : 'todo';
+                  const skip = r.done ? null : skipOf(state, r.id);
+                  const status = r.done ? 'done' : skip === 'drop' ? 'dropped' : skip === 'later' ? 'skipped' : started ? 'started' : 'todo';
                   const label = {
                     done: 'Completata',
+                    skipped: 'Saltata · da recuperare',
+                    dropped: 'Tolta dal percorso',
                     started: st?.stage?.label ? `In corso · fatto fino a ${st.stage.label}` : 'In corso',
                     todo: available ? 'Da fare' : 'In preparazione',
                   }[status];
@@ -255,7 +268,7 @@ export class Course {
                     el('span', { class: 'session-title' }, r.title, el('span', { class: 'session-track' }, r.track)),
                     el('span', { class: 'session-state' }, label),
                   ];
-                  return el('li', {}, available ? el('a', { class: 'session-row', href: `#doc=${path}` }, inner) : el('div', { class: 'session-row is-disabled' }, inner));
+                  return el('li', { class: status === 'dropped' ? 'is-dropped' : '' }, available ? el('a', { class: 'session-row', href: `#doc=${path}` }, inner) : el('div', { class: 'session-row is-disabled' }, inner));
                 }),
             ),
           ),
@@ -368,7 +381,8 @@ export class Course {
     const v = this.view;
     if (!v || !v.stepper?.isConnected) return;
     const doc = this.state.load(v.base).doc;
-    const s = doc.sessions[v.sid] || { stage: null, custom: {} };
+    const s = doc.sessions[v.sid] || { stage: null, skip: null, custom: {} };
+    const skip = s.skip?.value || null;
     const stage = Math.min(s.stage?.value || 0, v.steps.length);
     const completed = v.row?.done === true;
 
@@ -415,6 +429,7 @@ export class Course {
               ? `Prossima fase: ${v.steps[stage].label}.`
               : 'Tutte le fasi fatte: chiudi la sessione in fondo alla pagina.',
       ),
+      completed ? null : this._skipControls(skip),
     );
     v.steps.forEach((step, k) => step.node.classList.toggle('is-done', completed || k < stage));
 
@@ -501,6 +516,48 @@ export class Course {
     );
   }
 
+  /** "Skip this topic": no exercises, reviews or flashcards on it; recover it later or drop it for good. */
+  _skipControls(skip) {
+    const v = this.view;
+    if (skip) {
+      return el(
+        'div',
+        { class: 'skip-box is-skipped' },
+        el(
+          'p',
+          { class: 'skip-msg' },
+          skip === 'drop'
+            ? 'Argomento tolto dal percorso: niente esercizi, ripassi né flashcard su questo.'
+            : 'Argomento saltato, da recuperare più avanti: fino ad allora niente ripassi né flashcard su questo.',
+        ),
+        el('button', { type: 'button', class: 'btn btn-small btn-ghost', onclick: () => this.setSkip('') }, 'Annulla il salto'),
+      );
+    }
+    if (!v.skipAsk) {
+      return el('div', { class: 'skip-box' }, el('button', { type: 'button', class: 'link-btn skip-open', onclick: () => ((v.skipAsk = true), this._refreshChecks()) }, 'Salta questo argomento'));
+    }
+    return el(
+      'div',
+      { class: 'skip-box is-asking' },
+      el('p', { class: 'skip-msg' }, 'Salti l’argomento con esercizi, ripassi e flashcard. Poi?'),
+      el(
+        'div',
+        { class: 'skip-actions' },
+        el('button', { type: 'button', class: 'btn btn-small', dataset: { skip: 'later' }, onclick: () => this.setSkip('later') }, 'Recuperalo più avanti'),
+        el('button', { type: 'button', class: 'btn btn-small', dataset: { skip: 'drop' }, onclick: () => this.setSkip('drop') }, 'Toglilo per sempre'),
+        el('button', { type: 'button', class: 'btn btn-small btn-ghost', onclick: () => ((v.skipAsk = false), this._refreshChecks()) }, 'Annulla'),
+      ),
+    );
+  }
+
+  setSkip(value) {
+    const v = this.view;
+    if (!v) return;
+    v.skipAsk = false;
+    this._custom((s) => (s.skip = { value, updatedAt: Date.now() }));
+    if (value) toast(value === 'drop' ? `${v.sid} tolta dal percorso` : `${v.sid} saltata: da recuperare più avanti`);
+  }
+
   async toggleSolutions() {
     const v = this.view;
     if (!v?.solutionsPath) return;
@@ -521,6 +578,8 @@ export class Course {
     if (!v?.progressPath) return;
     try {
       await updateSessionDone(this.gh, v.progressPath, v.sid, done);
+      // Doing a skipped topic after all recovers it.
+      if (done && this.state.load(v.base).doc.sessions[v.sid]?.skip?.value) this._custom((s) => (s.skip = { value: '', updatedAt: Date.now() }));
       v.row = { ...v.row, done };
       this._refreshChecks();
       await this.onChanged?.();

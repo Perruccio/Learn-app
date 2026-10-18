@@ -119,6 +119,41 @@ await sleep(500);
 check('progress shows 1 completed session', new RegExp(`1 di ${ROWS.length}\\b`).test(await A.page.textContent('.progress-summary')), (await A.page.textContent('.progress-summary')).slice(0, 60));
 const rows = await A.page.$$eval('.session-row', (n) => n.map((r) => [r.querySelector('.session-id').textContent, r.querySelector('.session-state').textContent, r.tagName]));
 check('statuses: S001 done, S002 todo, unprepared sessions not yet available', rows[0][1] === 'Completata' && rows[1][1] === 'Da fare' && (!FIRST_UNLINKED || rows.find((r) => r[0] === FIRST_UNLINKED)[2] === 'DIV'), JSON.stringify(rows.slice(0, 2)));
+// Skip a topic: choose "recover later", then undo, then "drop for good"
+await A.page.click('.session-row >> text=S002');
+await A.page.waitForSelector('.skip-open');
+await A.page.click('.skip-open');
+await A.page.screenshot({ path: `${SHOTS}/c5-skip-ask.png` });
+await A.page.click('.skip-box [data-skip="later"]');
+await A.page.waitForSelector('.skip-box.is-skipped');
+check('skipped topic shown on the session page', /recuperare/.test(await A.page.textContent('.skip-box')));
+await synced(A.page);
+const skipState = JSON.parse(repo.get('matematica/stato.json').buf.toString()).sessions.S002?.skip;
+check('skip synced to stato.json', skipState?.value === 'later' && skipState.updatedAt > 0, JSON.stringify(skipState));
+await A.page.click('.skip-box .btn-ghost');
+await A.page.waitForSelector('.skip-open');
+check('skip can be undone', true);
+await A.page.click('.skip-open');
+await A.page.click('.skip-box [data-skip="drop"]');
+await A.page.waitForSelector('.skip-box.is-skipped');
+await A.page.click('#view-course a[href="#percorso"]');
+await A.page.waitForSelector('.progress-summary');
+await sleep(300);
+const dropped = await A.page.$$eval('.session-row', (n) => n.map((r) => r.querySelector('.session-state').textContent));
+check('dropped topic marked in the path and not counted', dropped[1] === 'Tolta dal percorso' && new RegExp(`1 di ${ROWS.length - 1}\\b`).test(await A.page.textContent('.progress-summary')), dropped[1]);
+await A.page.evaluate(() => (location.hash = '#'));
+await A.page.waitForSelector('#next-session:not([hidden])');
+await A.page.waitForFunction(() => !/S002/.test(document.querySelector('#next-title').textContent));
+check('home skips the dropped session', new RegExp(ROWS[2].id).test(await A.page.textContent('#next-title')), await A.page.textContent('#next-title'));
+// Tampered skip values are dropped by the codec
+const revived = await A.page.evaluate(async () => {
+  const { _test } = await import('./js/course.js');
+  const doc = _test.reviveState({ sessions: { S001: { skip: { value: '<img src=x onerror=alert(1)>', updatedAt: 1 } }, S002: { skip: { value: 'drop', updatedAt: 'x' } }, S003: { skip: { value: 'later', updatedAt: 5, evil: 1 } } } }, 'm');
+  return [doc.sessions.S001.skip, doc.sessions.S002.skip, doc.sessions.S003.skip];
+});
+check('tampered skip values rejected', revived[0] === null && revived[1] === null && JSON.stringify(revived[2]) === '{"value":"later","updatedAt":5}', JSON.stringify(revived));
+await A.page.evaluate(() => (location.hash = '#percorso'));
+await A.page.waitForSelector('.progress-summary');
 check('documents listed (method pages and roadmaps)', (await A.page.$$('.doc-links a')).length === N_DOCS, String((await A.page.$$('.doc-links a')).length));
 await A.page.screenshot({ path: `${SHOTS}/c2-progress.png`, fullPage: false });
 // A roadmap document renders with its table

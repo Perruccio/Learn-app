@@ -572,6 +572,10 @@ a.session-row:hover { border-color: var(--accent); }
 .status-dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--line); }
 .status-dot.s-done { background: var(--accent); border-color: var(--accent); }
 .status-dot.s-started { border-color: var(--accent); background: linear-gradient(90deg, var(--accent) 50%, transparent 50%); }
+.status-dot.s-skipped { border-style: dashed; border-color: var(--muted); }
+.status-dot.s-dropped { border-color: var(--line); background: var(--line); }
+.is-dropped .session-row { opacity: 0.55; }
+.is-dropped .session-title { text-decoration: line-through; }
 .doc-links a { display: block; padding: 10px 14px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); text-decoration: none; color: var(--ink); }
 .doc-links a:hover { border-color: var(--accent); }
 
@@ -654,6 +658,12 @@ a.check-label:hover { color: var(--accent); }
 .step.s-done .step-dot { border-color: transparent; background: rgba(255, 255, 255, 0.22); }
 .step.s-next button { border-color: var(--accent); color: var(--ink); }
 .step-hint { margin: 8px 2px 0; font-size: 13px; color: var(--muted); }
+.skip-box { margin: 6px 2px 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; }
+.skip-box.is-skipped, .skip-box.is-asking { padding: 10px 12px; border: 1px dashed var(--line); border-radius: 12px; }
+.skip-msg { margin: 0; flex: 1 1 220px; color: var(--muted); }
+.skip-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.link-btn { padding: 4px 0; border: 0; background: none; color: var(--muted); font: inherit; text-decoration: underline; cursor: pointer; }
+.link-btn:hover { color: var(--ink); }
 .md h2.is-done { color: var(--muted); }
 .md h2.is-done::after { content: '  ✓'; color: var(--accent); }
 .todo-head { margin-top: 14px; }

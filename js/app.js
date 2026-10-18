@@ -1,15 +1,15 @@
 // App shell: configuration, routing, library and sync triggers.
 
-import { $, el, debounce, dirName, formatSize, prettyName, storage, toast } from './util.js?v=ddb71df778fc';
-import { GitHub } from './github.js?v=ddb71df778fc';
-import { SyncManager, liveAnnotations } from './sync.js?v=ddb71df778fc';
-import { Reader, isPdfCached } from './reader.js?v=ddb71df778fc';
-import { loadDecks, loadMath, progressCodec, tickSession } from './cards.js?v=ddb71df778fc';
-import { ReviewSession, summarize } from './review.js?v=ddb71df778fc';
-import { Course, stateCodec } from './course.js?v=ddb71df778fc';
+import { $, el, debounce, dirName, formatSize, prettyName, storage, toast } from './util.js?v=2b06f7adf1a7';
+import { GitHub } from './github.js?v=2b06f7adf1a7';
+import { SyncManager, liveAnnotations } from './sync.js?v=2b06f7adf1a7';
+import { Reader, isPdfCached } from './reader.js?v=2b06f7adf1a7';
+import { loadDecks, loadMath, progressCodec, tickSession } from './cards.js?v=2b06f7adf1a7';
+import { ReviewSession, summarize } from './review.js?v=2b06f7adf1a7';
+import { Course, skipOf, stateCodec } from './course.js?v=2b06f7adf1a7';
 
 // Stamped by scripts/stamp.py on every release (do not edit by hand).
-const APP_VERSION = 'ddb71df778fc';
+const APP_VERSION = '2b06f7adf1a7';
 const CONFIG_KEY = 'learnreader:config';
 const MAX_UPLOAD_BYTES = 95 * 1024 * 1024;
 
@@ -334,14 +334,16 @@ async function renderHomePanels({ pull = true } = {}) {
   if (token !== panelsToken) return;
   app.decks = decks;
 
-  // Next session = first unticked row of the first progress table.
+  // Next session = first unticked, not skipped row of the first progress table.
   const table = decks.dirs.find((d) => d.rows.length) || null;
-  const next = table?.rows.find((r) => !r.done) || null;
+  const base = table ? dirName(table.progressFile.path) : '';
+  const state = table ? app.state.load(base).doc : null;
+  const rows = table ? table.rows.filter((r) => r.done || skipOf(state, r.id) !== 'drop') : [];
+  const next = rows.find((r) => !r.done && !skipOf(state, r.id)) || null;
   $('#next-session').hidden = !next;
   if (next) {
     $('#next-title').textContent = `${next.id} · ${next.title}`;
-    $('#next-meta').textContent = `${next.track} · ${table.rows.filter((r) => r.done).length} di ${table.rows.length} completate`;
-    const base = dirName(table.progressFile.path);
+    $('#next-meta').textContent = `${next.track} · ${rows.filter((r) => r.done).length} di ${rows.length} completate`;
     const link = next.link ? `#doc=${base ? `${base}/` : ''}${next.link}` : null;
     $('#next-open').hidden = !link;
     if (link) $('#next-open').href = link;
