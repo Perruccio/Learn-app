@@ -73,11 +73,24 @@ export function parseCardFile(text, path) {
 export function parseProgress(text) {
   const rows = [];
   const re = /^\|\s*\[( |x|X)\]\s*\|\s*(?:\[([A-Za-z]+\d+)\]\(([^)\s]+)\)|([A-Za-z]+\d+))\s*\|\s*([^|]*)\|\s*([^|]*)\|/;
+  let block = '';
   for (const line of text.split(/\r?\n/)) {
+    const h = line.match(/^##\s+(.+?)\s*$/);
+    if (h) block = h[1];
     const m = line.match(re);
-    if (m) rows.push({ done: m[1] !== ' ', id: m[2] || m[4], link: m[3] || null, track: m[5].trim(), title: m[6].trim() });
+    if (m) rows.push({ done: m[1] !== ' ', id: m[2] || m[4], link: m[3] || null, track: m[5].trim(), title: m[6].trim(), block });
   }
   return rows;
+}
+
+/** Return PROGRESSI.md text with one session marked done or not done (or null if not found). */
+export function setSessionDone(text, id, done) {
+  const lines = text.split('\n');
+  const re = new RegExp(`^\\|\\s*\\[( |x|X)\\]\\s*\\|\\s*(\\[${id}\\]\\([^)]*\\)|${id})\\s*\\|`);
+  const i = lines.findIndex((l) => re.test(l));
+  if (i < 0) return null;
+  lines[i] = lines[i].replace(/\[( |x|X)\]/, done ? '[x]' : '[ ]');
+  return lines.join('\n');
 }
 
 /** Return PROGRESSI.md text with one session ticked (or null if not found). */
@@ -314,25 +327,27 @@ export async function loadMath() {
  * Render card text with LaTeX (call loadMath() first): \( inline \), \[ display \], $$ display $$.
  * KaTeX runs with trust: false (no \href, \url, \includegraphics or raw HTML).
  */
+const KATEX_OPTIONS = { throwOnError: false, trust: false, strict: 'ignore', maxExpand: 500, maxSize: 20, output: 'htmlAndMathml' };
+
+/** A rendered formula (inline span or display div). Requires loadMath(). */
+export function mathNode(tex, display) {
+  const node = document.createElement(display ? 'div' : 'span');
+  node.className = display ? 'math-display' : 'math-inline';
+  if (!katex) {
+    node.textContent = tex; // KaTeX not loaded: show the source rather than nothing
+    return node;
+  }
+  katex.render(tex, node, { ...KATEX_OPTIONS, displayMode: display });
+  return node;
+}
+
 export function renderRich(container, text) {
   container.replaceChildren();
   const re = /\\\(([\s\S]+?)\\\)|\\\[([\s\S]+?)\\\]|\$\$([\s\S]+?)\$\$/g;
   let last = 0;
   for (const m of text.matchAll(re)) {
     appendText(container, text.slice(last, m.index));
-    const display = m[1] === undefined;
-    const span = document.createElement(display ? 'div' : 'span');
-    span.className = display ? 'math-display' : 'math-inline';
-    katex.render(decodeEntities(m[1] ?? m[2] ?? m[3]), span, {
-      displayMode: display,
-      throwOnError: false,
-      trust: false,
-      strict: 'ignore',
-      maxExpand: 500,
-      maxSize: 20,
-      output: 'htmlAndMathml',
-    });
-    container.append(span);
+    container.append(mathNode(decodeEntities(m[1] ?? m[2] ?? m[3]), m[1] === undefined));
     last = m.index + m[0].length;
   }
   appendText(container, text.slice(last));
@@ -345,18 +360,21 @@ export function renderRich(container, text) {
  * blob sha, so only changed files are downloaded.
  * Returns {cards, locked, dirs: [{dir, progressFile, rows}]}.
  */
+/** Text of a repository file, cached on the device by blob sha (only changed files are downloaded). */
+export async function readText(gh, file) {
+  const key = `learnreader:text:${file.sha}`;
+  const cached = storage.get(key);
+  if (typeof cached === 'string') return cached;
+  const remote = await gh.getTextFile(file.path);
+  const text = remote?.text ?? '';
+  storage.set(key, text);
+  return text;
+}
+
 export async function loadDecks(gh, allFiles) {
   const cardFiles = allFiles.filter((f) => CARD_FILE_RE.test(f.path));
   const dirs = [...new Set(cardFiles.map((f) => dirName(f.path)))];
-  const readCached = async (file) => {
-    const key = `learnreader:text:${file.sha}`;
-    const cached = storage.get(key);
-    if (typeof cached === 'string') return cached;
-    const remote = await gh.getTextFile(file.path);
-    const text = remote?.text ?? '';
-    storage.set(key, text);
-    return text;
-  };
+  const readCached = (file) => readText(gh, file);
   const out = { cards: [], locked: 0, dirs: [] };
   for (const dir of dirs) {
     const parent = dirName(dir);

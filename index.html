@@ -43,6 +43,7 @@
       <symbol id="i-cards" viewBox="0 0 24 24"><rect x="6.5" y="3.5" width="13" height="16" rx="2"/><path d="M4.5 7v11.5a2 2 0 0 0 2 2H15"/><path d="M10 9.5h6M10 13h4"/></symbol>
       <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 7.5L5 11.5l4 4"/><path d="M5 11.5h9.5a4.5 4.5 0 0 1 0 9H12"/></symbol>
       <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+      <symbol id="i-path" viewBox="0 0 24 24"><circle cx="6" cy="18" r="2.2"/><circle cx="18" cy="6" r="2.2"/><path d="M8.2 18H15a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h6.8"/></symbol>
       <symbol id="i-book" viewBox="0 0 24 24"><path d="M5 4.5h10.5a3 3 0 0 1 3 3v12H8a3 3 0 0 1-3-3z"/><path d="M5 16.5a3 3 0 0 1 3-3h10.5"/></symbol>
     </defs>
   </svg>
@@ -96,6 +97,7 @@
       <div class="brand"><svg class="brand-mark"><use href="#i-book"/></svg><span>Learn Reader</span></div>
       <div class="lib-actions">
         <button type="button" class="sync-pill" data-sync-pill title="Sincronizza ora"><svg class="icon"><use href="#i-sync"/></svg><span class="sync-text">Sincronizzato</span></button>
+        <a class="icon-btn" href="#percorso" title="Percorso" aria-label="Percorso"><svg class="icon"><use href="#i-path"/></svg></a>
         <button type="button" class="icon-btn" id="btn-upload" title="Aggiungi PDF" aria-label="Aggiungi PDF"><svg class="icon"><use href="#i-upload"/></svg></button>
         <a class="icon-btn" href="#setup" title="Impostazioni" aria-label="Impostazioni"><svg class="icon"><use href="#i-gear"/></svg></a>
       </div>
@@ -111,8 +113,8 @@
           <p class="next-title" id="next-title"></p>
           <p class="muted small" id="next-meta"></p>
           <div class="panel-actions">
-            <a class="btn" id="next-open" target="_blank" rel="noopener noreferrer">Apri la scheda</a>
-            <button type="button" class="btn btn-ghost" id="next-done"><svg class="icon"><use href="#i-check"/></svg>Segna come fatta</button>
+            <a class="btn btn-primary" id="next-open">Apri la sessione</a>
+            <a class="btn btn-ghost" href="#percorso">Percorso</a>
           </div>
         </div>
         <div class="panel-card" id="review-panel" hidden>
@@ -144,6 +146,22 @@
         </div>
       </form>
     </dialog>
+  </section>
+
+  <!-- ============================== Course (progress + documents) ============================== -->
+  <section id="view-course" class="view" hidden>
+    <header class="toolbar">
+      <div class="tb-group tb-left">
+        <button type="button" class="icon-btn" id="course-back" title="Indietro" aria-label="Indietro"><svg class="icon"><use href="#i-back"/></svg></button>
+        <span class="reader-title course-title" id="course-title"></span>
+      </div>
+      <div class="tb-group tb-right">
+        <a class="icon-btn" href="#percorso" title="Percorso" aria-label="Percorso"><svg class="icon"><use href="#i-path"/></svg></a>
+        <a class="icon-btn" href="#ripasso" title="Ripasso flashcard" aria-label="Ripasso flashcard"><svg class="icon"><use href="#i-cards"/></svg></a>
+        <button type="button" class="sync-pill compact" data-sync-pill title="Sincronizza ora"><svg class="icon"><use href="#i-sync"/></svg><span class="sync-text">Sincronizzato</span></button>
+      </div>
+    </header>
+    <main class="course-main" id="course-main"></main>
   </section>
 
   <!-- ============================== Review ============================== -->

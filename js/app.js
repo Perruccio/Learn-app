@@ -6,11 +6,12 @@ import { SyncManager, liveAnnotations } from './sync.js';
 import { Reader, isPdfCached } from './reader.js';
 import { loadDecks, loadMath, progressCodec, tickSession } from './cards.js';
 import { ReviewSession, summarize } from './review.js';
+import { Course, stateCodec } from './course.js';
 
 const CONFIG_KEY = 'learnreader:config';
 const MAX_UPLOAD_BYTES = 95 * 1024 * 1024;
 
-const app = { cfg: null, gh: null, sync: null, cards: null, reader: null, review: null, files: null, allFiles: null, decks: null, uploadQueue: [] };
+const app = { cfg: null, gh: null, sync: null, cards: null, state: null, course: null, reader: null, review: null, files: null, allFiles: null, decks: null, uploadQueue: [] };
 
 // ------------------------------------------------------------------ config
 
@@ -55,9 +56,12 @@ function connect(cfg) {
   app.gh = new GitHub(cfg);
   app.sync = new SyncManager(app.gh, cfg);
   app.cards = new SyncManager(app.gh, cfg, progressCodec);
+  app.state = new SyncManager(app.gh, cfg, stateCodec);
+  app.course = new Course({ gh: app.gh, cfg, state: app.state, onChanged: () => refreshFiles().catch(() => {}) });
   app.allFiles = storage.get(filesKey(), null);
   app.files = app.allFiles ? pdfsOf(app.allFiles) : null;
-  for (const manager of [app.sync, app.cards]) {
+  app.course.setFiles(app.allFiles);
+  for (const manager of [app.sync, app.cards, app.state]) {
     manager.addEventListener('status', () => renderSyncStatus());
     manager.addEventListener('unauthorized', () => {
       toast('Token non valido o scaduto: ricollega il repository', { error: true, ms: 6000 });
@@ -82,7 +86,7 @@ function filesKey() {
 // ------------------------------------------------------------------ views & routing
 
 function showView(name) {
-  for (const v of ['setup', 'library', 'reader', 'review']) $(`#view-${v}`).hidden = v !== name;
+  for (const v of ['setup', 'library', 'reader', 'review', 'course']) $(`#view-${v}`).hidden = v !== name;
   document.body.dataset.view = name;
 }
 
@@ -93,11 +97,13 @@ function parseHash() {
     page: parseInt(params.get('page'), 10) || null,
     setup: params.has('setup'),
     review: params.has('ripasso'),
+    progress: params.has('percorso'),
+    doc: params.get('doc'),
   };
 }
 
 async function route() {
-  const { read, page, setup, review } = parseHash();
+  const { read, page, setup, review, progress, doc } = parseHash();
   if (!app.cfg || setup) {
     await app.reader?.close();
     showSetup();
@@ -110,6 +116,10 @@ async function route() {
   await app.reader?.close();
   if (review) {
     await startReview();
+    return;
+  }
+  if (progress || doc) {
+    await openCourse(doc);
     return;
   }
   if (document.body.dataset.view === 'review') app.cards.syncAll();
@@ -209,9 +219,10 @@ async function refreshFiles() {
   const { files, truncated } = await app.gh.listFiles();
   if (truncated) toast('Repository molto grande: alcuni file potrebbero non comparire', { error: true });
   // Keep only what the app uses: PDFs, card files and progress tables.
-  const relevant = files.filter((f) => /\.(pdf|tsv)$/i.test(f.path) || /(^|\/)PROGRESSI\.md$/.test(f.path));
+  const relevant = files.filter((f) => /\.(pdf|tsv|md)$/i.test(f.path));
   app.allFiles = relevant;
   app.files = pdfsOf(relevant);
+  app.course?.setFiles(relevant);
   storage.set(filesKey(), relevant);
   return app.files;
 }
@@ -329,10 +340,9 @@ async function renderHomePanels({ pull = true } = {}) {
     $('#next-title').textContent = `${next.id} · ${next.title}`;
     $('#next-meta').textContent = `${next.track} · ${table.rows.filter((r) => r.done).length} di ${table.rows.length} completate`;
     const base = dirName(table.progressFile.path);
-    const link = next.link ? `https://github.com/${app.cfg.owner}/${app.cfg.repo}/blob/${app.cfg.branch}/${base ? `${base}/` : ''}${next.link}` : null;
+    const link = next.link ? `#doc=${base ? `${base}/` : ''}${next.link}` : null;
     $('#next-open').hidden = !link;
     if (link) $('#next-open').href = link;
-    $('#next-done').onclick = () => markDone(table.progressFile.path, next.id);
   }
 
   drawReviewPanel(decks);
@@ -361,31 +371,44 @@ function drawReviewPanel(decks) {
   $('#rv-start').classList.toggle('is-disabled', s.due + s.fresh === 0);
 }
 
-async function markDone(progressPath, id) {
-  const button = $('#next-done');
-  button.disabled = true;
+async function openCourse(docPath) {
+  showView('course');
+  const main = $('#course-main');
+  const setTitle = (text) => {
+    $('#course-title').textContent = text;
+    document.title = `${text} · Learn Reader`;
+  };
+  $('#course-back').onclick = () => {
+    if (docPath && /\/sessioni\//.test(docPath)) location.hash = 'percorso';
+    else if (docPath) history.length > 1 ? history.back() : (location.hash = 'percorso');
+    else location.hash = '';
+  };
   try {
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const file = await app.gh.getTextFile(progressPath);
-      const updated = file && tickSession(file.text, id);
-      if (!updated) throw new Error(`${id} non trovata in ${progressPath}`);
-      try {
-        await app.gh.putFile(progressPath, { text: updated }, file.sha, `reader: ${id} completata`);
-        break;
-      } catch (err) {
-        if ((err.status === 409 || err.status === 422) && attempt < 2) continue;
-        throw err;
-      }
-    }
-    await refreshFiles();
-    await renderHomePanels();
-    const unlocked = app.decks?.cards.filter((c) => c.stem === id).length || 0;
-    toast(unlocked ? `${id} completata: ${unlocked} nuove flashcard sbloccate` : `${id} completata`);
+    if (!app.allFiles) await refreshFiles();
   } catch (err) {
-    toast(err.status === 0 ? 'Offline: riprova quando sei connesso' : `Non riesco a segnare ${id}: ${err.message}`, { error: true, ms: 6000 });
-  } finally {
-    button.disabled = false;
+    if (!app.allFiles) {
+      main.replaceChildren(el('p', { class: 'form-error' }, err.status === 0 ? 'Offline e contenuti non ancora scaricati.' : err.message));
+      return;
+    }
   }
+  main.scrollTop = 0;
+  if (!docPath) {
+    setTitle('Percorso');
+    await app.course.renderProgress(main);
+    // Pull checklist state from other devices, then refresh the view.
+    const bases = [...new Set(app.allFiles.filter((f) => /(^|\/)PROGRESSI\.md$/.test(f.path)).map((f) => dirName(f.path)))];
+    Promise.allSettled(bases.map((b) => app.state.sync(b))).then(() => {
+      if (parseHash().progress) app.course.renderProgress(main);
+    });
+    return;
+  }
+  if (!app.course.file(docPath)) {
+    // The file may have been added after the list was cached.
+    await refreshFiles().catch(() => {});
+  }
+  await app.course.renderDoc(main, docPath, { title: setTitle });
+  const sessionBase = /\/sessioni\//.test(docPath) ? dirName(dirName(docPath)) : null;
+  if (sessionBase !== null) app.state.sync(sessionBase).catch(() => {});
 }
 
 async function startReview() {
@@ -480,7 +503,7 @@ function bindUpload() {
 
 function renderSyncStatus() {
   const order = ['syncing', 'error', 'offline', 'pending', 'synced'];
-  const statuses = [app.sync, app.cards].filter(Boolean).map((m) => m.status());
+  const statuses = [app.sync, app.cards, app.state].filter(Boolean).map((m) => m.status());
   const status = statuses.sort((a, b) => order.indexOf(a.state) - order.indexOf(b.state))[0] || { state: 'synced', message: 'Sincronizzato' };
   for (const pill of document.querySelectorAll('[data-sync-pill]')) {
     pill.dataset.state = status.state;
@@ -493,7 +516,7 @@ async function syncNow() {
   if (!app.sync) return;
   app.reader?.savePosition.flush();
   app.reader?.saveNote.flush();
-  const tasks = [app.sync.syncAll(), app.cards.syncAll()];
+  const tasks = [app.sync.syncAll(), app.cards.syncAll(), app.state.syncAll()];
   if (app.reader?.book) tasks.push(app.sync.sync(app.reader.book));
   const results = await Promise.allSettled(tasks);
   const failed = results.find((r) => r.status === 'rejected');
@@ -517,6 +540,7 @@ function bindGlobal() {
       app.reader?.saveNote.flush();
       app.sync.syncAll();
       app.cards.syncAll();
+      app.state.syncAll();
     } else if (app.reader?.book) {
       app.sync.sync(app.reader.book).catch(() => {}); // pull edits made on other devices
     }
@@ -527,10 +551,12 @@ function bindGlobal() {
     app.reader?.saveNote.flush();
     app.sync.syncAll();
     app.cards.syncAll();
+    app.state.syncAll();
   });
   window.addEventListener('online', () => {
     app.sync?.syncAll();
     app.cards?.syncAll();
+    app.state?.syncAll();
   });
   const onFullscreen = () => {
     const full = !!(document.fullscreenElement || document.webkitFullscreenElement);
@@ -556,5 +582,6 @@ if (saved) {
   connect(saved);
   app.sync.syncAll();
   app.cards.syncAll();
+  app.state.syncAll();
 }
 route();
