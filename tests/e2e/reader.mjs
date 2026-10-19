@@ -226,12 +226,43 @@ check('outline rendered', (await A.page.$$('.outline-item')).length === 6);
 await A.page.click('.outline-item >> text=Chapter 5: Topic 5');
 await sleep(600);
 check('outline navigates', Number(await A.page.inputValue('#page-input')) === 5);
+check('back button appears after an outline jump', await A.page.isVisible('#btn-jump-back'));
 await A.page.click('[data-panel-tab="search"]');
 await A.page.fill('#find-input', 'vector space');
 await A.page.press('#find-input', 'Enter');
 await sleep(1200);
 check('search finds matches', /di \d+/.test(await A.page.textContent('#find-status')), await A.page.textContent('#find-status'));
 await A.page.click('#panel-close');
+
+// 6b. Back button after following an internal PDF link
+let dialogs = 0;
+const onDialog = (d) => {
+  dialogs++;
+  d.dismiss();
+};
+A.page.on('dialog', onDialog);
+await A.page.fill('#page-input', '1');
+await A.page.press('#page-input', 'Enter');
+await sleep(400);
+const internalLink = A.page.locator('.page[data-page-number="1"] .annotationLayer a').first();
+await internalLink.scrollIntoViewIfNeeded();
+await A.page.evaluate(() => (document.querySelector('#viewerContainer').scrollTop += 150)); // a non-trivial offset
+await sleep(300);
+const beforeJump = await A.page.evaluate(() => ({ top: document.querySelector('#viewerContainer').scrollTop, page: document.querySelector('#page-input').value }));
+await internalLink.click();
+await sleep(600);
+check('internal link jumps to page 5 without confirmation', Number(await A.page.inputValue('#page-input')) === 5 && dialogs === 0, `page ${await A.page.inputValue('#page-input')}, dialogs ${dialogs}`);
+await A.page.screenshot({ path: `${SHOTS}/03b-jump-back.png` });
+check('back button shows the origin page', (await A.page.textContent('#jump-back-label')) === `p. ${beforeJump.page}`, await A.page.textContent('#jump-back-label'));
+await A.page.click('#btn-jump-back');
+await sleep(600);
+const afterBack = await A.page.evaluate(() => document.querySelector('#viewerContainer').scrollTop);
+check('back button returns to the exact position', Math.abs(afterBack - beforeJump.top) < 4, `${beforeJump.top} -> ${afterBack}`);
+const olderLabel = await A.page.textContent('#jump-back-label');
+await A.page.keyboard.press('Alt+ArrowLeft');
+await sleep(600);
+check('Alt+Left walks further back', `p. ${await A.page.inputValue('#page-input')}` === olderLabel, `${olderLabel} vs p. ${await A.page.inputValue('#page-input')}`);
+A.page.off('dialog', onDialog);
 
 await A.page.waitForFunction(() => document.querySelector('[data-sync-pill]').dataset.state === 'synced', null, { timeout: 15000 });
 remote = remoteAnn();

@@ -2,7 +2,7 @@
 
 Lettore PDF web per studiare dai libri del repository [`Perruccio/Learn`](https://github.com/Perruccio/Learn) (privato), con:
 
-- lettura a schermo intero, zoom (anche pinch e Ctrl+rotella), indice del PDF, ricerca nel testo;
+- lettura a schermo intero, zoom (anche pinch e Ctrl+rotella), indice del PDF, ricerca nel testo, tasto «indietro» dopo un link interno (anche Alt+←);
 - evidenziazioni del testo in 4 colori, evidenziazioni ad area (per PDF scansionati e formule), note sulla pagina e note sulle evidenziazioni;
 - ripresa dall'ultima pagina letta, su qualsiasi dispositivo;
 - sincronizzazione su GitHub: ogni modifica è salvata subito sul dispositivo e sincronizzata in background pochi secondi dopo (e quando chiudi il libro o lasci l'app). Le modifiche fatte su dispositivi diversi vengono unite, annotazione per annotazione;

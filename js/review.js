@@ -1,6 +1,6 @@
 // Flashcard review session (spaced repetition with FSRS).
 
-import { $, el, clamp, toast } from './util.js?v=2b06f7adf1a7';
+import { $, el, clamp, toast } from './util.js?v=d60f1a659351';
 import {
   NEW_PER_DAY,
   Rating,
@@ -15,7 +15,7 @@ import {
   renderRich,
   scheduler,
   toFsrsCard,
-} from './cards.js?v=2b06f7adf1a7';
+} from './cards.js?v=d60f1a659351';
 
 const RATINGS = [
   { rating: Rating.Again, label: 'Di nuovo', key: '1', cls: 'again' },

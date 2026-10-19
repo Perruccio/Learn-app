@@ -7,7 +7,7 @@
 // Review state is stored in "<folder>/progresso.json" and synced like annotations.
 
 import { fsrs, generatorParameters, createEmptyCard, Rating, State } from '../vendor/ts-fsrs/ts-fsrs.mjs';
-import { dirName, storage } from './util.js?v=2b06f7adf1a7';
+import { dirName, storage } from './util.js?v=d60f1a659351';
 
 export { Rating, State };
 
