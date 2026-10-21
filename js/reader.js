@@ -3,8 +3,8 @@
 // Annotation geometry is stored as fractions of the page box ([x, y, w, h] in
 // 0..1), so it is independent of zoom level and device.
 
-import { $, el, debounce, clamp, isNarrow, prettyName, storage, toast, uid } from './util.js?v=424474b999d1';
-import { liveAnnotations } from './sync.js?v=424474b999d1';
+import { $, el, debounce, clamp, isNarrow, prettyName, storage, toast, uid } from './util.js?v=16e8e35a2e34';
+import { liveAnnotations } from './sync.js?v=16e8e35a2e34';
 
 export const COLORS = ['yellow', 'green', 'blue', 'pink'];
 const COLOR_LABELS = { yellow: 'Yellow', green: 'Green', blue: 'Blue', pink: 'Pink' };
@@ -125,6 +125,7 @@ export class Reader {
     this.pendingSelection = null;
     this.drag = null;
     this.findQuery = '';
+    this.jumps = []; // positions to return to after following a link (most recent last)
 
     this.savePosition = debounce((page) => {
       if (!this.book) return;
@@ -165,6 +166,8 @@ export class Reader {
     this.file = file;
     this.book = file.path;
     this.doc = this.sync.load(file.path).doc;
+    this.jumps = [];
+    this._updateJumpButton();
     this.closePopover();
     this.setTool('select');
     $('#reader-title').textContent = prettyName(file.path);
@@ -238,6 +241,8 @@ export class Reader {
     this._exitImmersive();
     const book = this.book;
     this.book = null;
+    this.jumps = [];
+    this._updateJumpButton();
     this.file = null;
     if (this.sync.dirtyBooks().includes(book)) this.sync.sync(book).catch(() => {});
     if (this.viewer) {
@@ -606,7 +611,11 @@ export class Reader {
         const link = e.target.closest('.annotationLayer a[href]');
         if (!link) return;
         const href = link.getAttribute('href') || '';
-        if (href.startsWith('#')) return; // internal destination inside the book
+        if (href.startsWith('#')) {
+          // Internal destination inside the book: remember where we were so we can come back.
+          this._pushJump();
+          return;
+        }
         e.preventDefault();
         e.stopPropagation();
         let url;
@@ -734,6 +743,54 @@ export class Reader {
     });
   }
 
+  /** Current reading position: page and vertical offset of the viewport top, in page heights. */
+  _currentPosition() {
+    const page = this.viewer.currentPageNumber;
+    const pageEl = this.viewer.getPageView(page - 1)?.div;
+    if (!pageEl || !pageEl.clientHeight) return { page, y: 0 };
+    const pr = pageEl.getBoundingClientRect();
+    const cr = this.container.getBoundingClientRect();
+    return { page, y: clamp((cr.top - pr.top) / pageEl.clientHeight, -1, 2) };
+  }
+
+  /** Remember the current position before a jump (link, outline, page number). */
+  _pushJump() {
+    if (!this.viewer || !this.pdf) return;
+    const pos = this._currentPosition();
+    const last = this.jumps[this.jumps.length - 1];
+    if (!last || last.page !== pos.page || Math.abs(last.y - pos.y) > 0.02) {
+      this.jumps.push(pos);
+      if (this.jumps.length > 50) this.jumps.shift();
+    }
+    this._updateJumpButton();
+  }
+
+  /** Return to the position saved before the most recent jump. */
+  jumpBack() {
+    const pos = this.jumps.pop();
+    this._updateJumpButton();
+    if (!pos || !this.viewer || !this.pdf) return;
+    const page = clamp(pos.page, 1, this.pdf.numPages);
+    this.viewer.scrollPageIntoView({ pageNumber: page });
+    requestAnimationFrame(() => {
+      const pageEl = this.viewer?.getPageView(page - 1)?.div;
+      if (!pageEl) return;
+      const pr = pageEl.getBoundingClientRect();
+      const cr = this.container.getBoundingClientRect();
+      this.container.scrollTop += pr.top - cr.top + pos.y * pageEl.clientHeight;
+    });
+  }
+
+  _updateJumpButton() {
+    const btn = $('#btn-jump-back');
+    const last = this.jumps[this.jumps.length - 1];
+    btn.hidden = !last;
+    if (!last) return;
+    $('#jump-back-label').textContent = `p. ${last.page}`;
+    btn.title = `Back to page ${last.page} (Alt+←)`;
+    btn.setAttribute('aria-label', `Back to page ${last.page}`);
+  }
+
   _updatePageIndicator(pageNumber) {
     const input = $('#page-input');
     if (document.activeElement !== input) input.value = pageNumber;
@@ -766,6 +823,7 @@ export class Reader {
     input.addEventListener('change', () => {
       if (!this.pdf) return;
       const n = clamp(parseInt(input.value, 10) || 1, 1, this.pdf.numPages);
+      if (n !== this.viewer.currentPageNumber) this._pushJump();
       this.viewer.currentPageNumber = n;
       input.value = n;
       input.blur();
@@ -796,6 +854,7 @@ export class Reader {
     this.setColor(this.color);
     $('#btn-fullscreen').addEventListener('click', () => this.toggleFullscreen());
     $('#btn-exit-immersive').addEventListener('click', () => this._exitImmersive());
+    $('#btn-jump-back').addEventListener('click', () => this.jumpBack());
 
     document.addEventListener('keydown', (e) => {
       if (!this.book || this.root.hidden) return;
@@ -804,6 +863,11 @@ export class Reader {
         if (!$('#popover').hidden) this.closePopover();
         else if (this.tool !== 'select') this.setTool('select');
         else if (this.root.classList.contains('immersive')) this._exitImmersive();
+        return;
+      }
+      if (!typing && e.altKey && e.key === 'ArrowLeft' && this.jumps.length) {
+        e.preventDefault();
+        this.jumpBack();
         return;
       }
       if (typing || e.metaKey || e.altKey) return;
@@ -991,6 +1055,7 @@ export class Reader {
                 disabled: !item.dest,
                 onclick: () => {
                   if (!item.dest) return;
+                  this._pushJump();
                   this.linkService.goToDestination(item.dest);
                   if (isNarrow()) this.closePanel();
                 },

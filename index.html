@@ -21,7 +21,7 @@
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="vendor/pdfjs/web/pdf_viewer.css">
   <link rel="stylesheet" href="vendor/katex/katex.min.css">
-  <link rel="stylesheet" href="css/app.css?v=424474b999d1">
+  <link rel="stylesheet" href="css/app.css?v=16e8e35a2e34">
 </head>
 <body data-view="">
   <svg class="sprite" width="0" height="0" aria-hidden="true">
@@ -250,6 +250,8 @@
 
     <p id="tool-hint" class="tool-hint" hidden></p>
 
+    <button type="button" id="btn-jump-back" class="jump-back" hidden aria-label="Go back"><svg class="icon"><use href="#i-undo"/></svg><span id="jump-back-label"></span></button>
+
     <button type="button" id="btn-exit-immersive" class="exit-immersive" hidden aria-label="Exit full screen"><svg class="icon"><use href="#i-shrink"/></svg></button>
 
     <aside id="panel" class="panel" hidden>
@@ -304,6 +306,6 @@
 
   <div id="toasts" class="toasts" aria-live="polite"></div>
 
-  <script type="module" src="js/app.js?v=424474b999d1"></script>
+  <script type="module" src="js/app.js?v=16e8e35a2e34"></script>
 </body>
 </html>

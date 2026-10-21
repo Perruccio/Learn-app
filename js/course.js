@@ -5,9 +5,9 @@
 // session, personal to-dos and the error log are stored in "<base>/state.json"
 // (synced like annotations).
 
-import { el, dirName, toast, uid } from './util.js?v=424474b999d1';
-import { loadMath, parseProgress, readText, setSessionDone } from './cards.js?v=424474b999d1';
-import { joinPath, renderMarkdown } from './markdown.js?v=424474b999d1';
+import { el, dirName, toast, uid } from './util.js?v=16e8e35a2e34';
+import { loadMath, parseProgress, readText, setSessionDone } from './cards.js?v=16e8e35a2e34';
+import { joinPath, renderMarkdown } from './markdown.js?v=16e8e35a2e34';
 
 const SESSION_ID = /^[A-Z]\d{2,4}$/;
 const ID_RE = /^[a-z0-9]{4,24}$/;

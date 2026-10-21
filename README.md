@@ -2,7 +2,7 @@
 
 Web PDF reader for studying from the books of the [`Perruccio/Learn`](https://github.com/Perruccio/Learn) repository (private), with:
 
-- full-screen reading, zoom (pinch and Ctrl+wheel too), PDF table of contents, text search;
+- full-screen reading, zoom (pinch and Ctrl+wheel too), PDF table of contents, text search, a "back" button after an internal link (Alt+← too);
 - text highlights in 4 colors, area highlights (for scanned PDFs and formulas), notes on the page and notes on highlights;
 - resume from the last page read, on any device;
 - sync through GitHub: every change is saved on the device right away and synced in the background a few seconds later (and when you close the book or leave the app). Changes made on different devices are merged, annotation by annotation;

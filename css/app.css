@@ -290,7 +290,18 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
   backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
 }
 
-/* tools */
+/* back after following a link */
+.jump-back {
+  position: absolute; z-index: 26; left: 12px;
+  top: calc(var(--toolbar-h) + var(--safe-top) + 10px);
+  display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px 0 8px;
+  border-radius: 18px; border: 1px solid var(--line); cursor: pointer;
+  background: var(--surface); color: var(--ink); box-shadow: var(--shadow);
+  font-size: 13px; font-weight: 600;
+}
+.jump-back[hidden] { display: none; }
+#view-reader.immersive .jump-back { top: calc(10px + var(--safe-top)); }
+
 #view-reader[data-mode="area"] .page,
 #view-reader[data-mode="note"] .page { cursor: crosshair; touch-action: none; }
 #view-reader[data-mode="area"] .textLayer,
