@@ -1,87 +1,89 @@
 # Learn Reader
 
-Lettore PDF web per studiare dai libri del repository [`Perruccio/Learn`](https://github.com/Perruccio/Learn) (privato), con:
+Web PDF reader for studying from the books of the [`Perruccio/Learn`](https://github.com/Perruccio/Learn) repository (private), with:
 
-- lettura a schermo intero, zoom (anche pinch e Ctrl+rotella), indice del PDF, ricerca nel testo;
-- evidenziazioni del testo in 4 colori, evidenziazioni ad area (per PDF scansionati e formule), note sulla pagina e note sulle evidenziazioni;
-- ripresa dall'ultima pagina letta, su qualsiasi dispositivo;
-- sincronizzazione su GitHub: ogni modifica è salvata subito sul dispositivo e sincronizzata in background pochi secondi dopo (e quando chiudi il libro o lasci l'app). Le modifiche fatte su dispositivi diversi vengono unite, annotazione per annotazione;
-- PDF scaricati una sola volta e poi letti dalla cache del dispositivo (anche offline).
-- **Percorso e sessioni nell'app**: avanzamento complessivo e per filone, pagina di ogni sessione (Markdown con formule) con una barra delle fasi (Ripasso · Domande · Teoria · Esercizi: un tocco sulla fase raggiunta), promemoria personali, «Salta questo argomento» (da recuperare più avanti o tolto per sempre: niente esercizi, ripassi né flashcard), soluzioni su richiesta, registro errori e pulsante "Segna la sessione come fatta". Stato in `<materia>/stato.json`, sincronizzato. GitHub non serve durante lo studio.
-- **Flashcard con ripetizione spaziata** (algoritmo FSRS, quello delle versioni recenti di Anki) e formule LaTeX (KaTeX). Le carte sono file `flashcard/*.tsv` nel repository privato; quelle di una sessione si sbloccano quando la sessione è segnata come fatta in `PROGRESSI.md` (anche dal pulsante **Segna come fatta** nella libreria). Lo stato del ripasso è in `flashcard/progresso.json`, sincronizzato come le annotazioni.
+- full-screen reading, zoom (pinch and Ctrl+wheel too), PDF table of contents, text search;
+- text highlights in 4 colors, area highlights (for scanned PDFs and formulas), notes on the page and notes on highlights;
+- resume from the last page read, on any device;
+- sync through GitHub: every change is saved on the device right away and synced in the background a few seconds later (and when you close the book or leave the app). Changes made on different devices are merged, annotation by annotation;
+- PDFs downloaded only once and then read from the device cache (offline too).
+- **Path and sessions in the app**: overall and per-track progress, a page for each session (Markdown with formulas) with a phase bar (Review · Pretest · Theory · Exercises: one tap on the phase reached), personal reminders, "Skip this topic" (to recover later or dropped for good: no exercises, reviews or flashcards), solutions on demand, error log and a "Mark session as done" button. State in `<subject>/state.json`, synced. GitHub is not needed while studying.
+- **Flashcards with spaced repetition** (FSRS algorithm, the one in recent Anki versions) and LaTeX formulas (KaTeX). Cards are `flashcards/*.tsv` files in the private repository; the cards of a session unlock when the session is marked as done in `PROGRESS.md` (also from the **Mark session as done** button on the session page). `ERR-*` (error log) and `HL-*` (PDF highlights) files are always active. Review state is in `flashcards/progress.json`, synced like annotations.
 
 **App:** <https://perruccio-learn.github.io/Learn-app/>
 
-## Come funziona
+## How it works
 
-Questo repository (pubblico) contiene solo il codice. I PDF e le annotazioni stanno nel repository privato, e l'app li legge e li scrive tramite l'API di GitHub con un token personale salvato nel browser.
+This repository (public) contains only the code. PDFs and annotations live in the private repository, and the app reads and writes them through the GitHub API with a personal token saved in the browser.
 
-Per ogni libro `cartella/nome.pdf` le annotazioni stanno in `cartella/nome.annotazioni.json`. Il file è JSON leggibile: un'annotazione per blocco, con pagina, colore, testo evidenziato, nota e posizione (in frazioni della pagina, quindi indipendente dallo zoom).
+For every book `folder/name.pdf` the annotations are in `folder/name.annotations.json`. The file is readable JSON: one annotation per block, with page, color, highlighted text, note and position (as fractions of the page, so independent of zoom).
 
-Link diretto a un libro e a una pagina:
+Direct link to a book and a page:
 
 ```
-https://perruccio-learn.github.io/Learn-app/#read=matematica/libri/axler-ladr-4ed.pdf&page=20
+https://perruccio-learn.github.io/Learn-app/#read=math/books/axler-ladr-4ed.pdf&page=20
 ```
 
-## Primo accesso (una volta per dispositivo)
+Other routes: `#path` (progress), `#review` (flashcards), `#doc=<file.md>`, `#setup`. The old `#percorso` and `#ripasso` still work and redirect to `#path` and `#review`.
 
-1. Crea un *fine-grained token* su GitHub: **Settings → Developer settings → Fine-grained tokens → Generate new token**.
+## First access (once per device)
+
+1. Create a *fine-grained token* on GitHub: **Settings → Developer settings → Fine-grained tokens → Generate new token**.
    - **Repository access:** *Only select repositories* → `Learn`.
    - **Permissions → Contents:** *Read and write*.
-2. Apri l'app, incolla il token e premi **Connetti**.
+2. Open the app, paste the token and press **Connect**.
 
-Su iPhone e Android: dal browser usa **Condividi → Aggiungi alla schermata Home**. L'app si apre a schermo intero, come un'app normale.
+On iPhone and Android: in the browser use **Share → Add to Home Screen**. The app opens full screen, like a regular app.
 
-## Sicurezza
+## Security
 
-### Cosa è pubblico e cosa no
+### What is public and what is not
 
-Il sito e questo repository sono pubblici, ma contengono **solo codice**: nessun dato, nessun segreto. Chi apre l'app senza token vede solo la schermata di collegamento e non può leggere niente. PDF, annotazioni e flashcard stanno nel repository privato `Learn`, raggiungibile solo con il token, che resta nel browser dei tuoi dispositivi. Il fatto che il codice sia leggibile non indebolisce nulla: la sicurezza non si basa sul tenerlo nascosto.
+The site and this repository are public, but they contain **only code**: no data, no secrets. Anyone opening the app without a token sees only the connection screen and cannot read anything. PDFs, annotations and flashcards live in the private `Learn` repository, reachable only with the token, which stays in the browser of your devices. The code being readable weakens nothing: security does not rely on keeping it hidden.
 
-### Rischi residui e contromisure
+### Residual risks and countermeasures
 
-| Rischio | Contromisura |
+| Risk | Countermeasure |
 |---|---|
-| Furto del token tramite codice iniettato (PDF, carte, annotazioni) | CSP rigida, nessuno script esterno, contenuti validati e inseriti solo come testo (dettagli sotto) |
-| L'app incorporata in una pagina malevola (clickjacking) | L'app si rifiuta di funzionare dentro un frame |
-| Dispositivo condiviso, perso o rubato | Opzione "Ricorda su questo dispositivo" disattivabile; token con scadenza; revoca immediata su github.com → Settings → Fine-grained tokens |
-| Furto del token: danni possibili | Il token vale per **un solo** repository e solo per i contenuti: niente impostazioni, niente altri repo |
-| Altri siti GitHub Pages dello stesso account | Tutti i siti `perruccio.github.io/*` condividono la stessa origine e quindi lo stesso spazio del browser. **Non pubblicare altri siti Pages con script di terze parti**, oppure sposta l'app su un'origine dedicata (vedi sotto) |
-| Compromissione dell'account GitHub (chi la ottiene può modificare il codice dell'app) | Autenticazione a due fattori sull'account GitHub (indispensabile) |
+| Token theft through injected code (PDFs, cards, annotations) | Strict CSP, no external scripts, content validated and inserted only as text (details below) |
+| The app embedded in a malicious page (clickjacking) | The app refuses to run inside a frame |
+| Shared, lost or stolen device | "Remember on this device" option can be turned off; token with expiration; immediate revocation on github.com → Settings → Fine-grained tokens |
+| Token theft: possible damage | The token is valid for **one** repository and only for its contents: no settings, no other repos |
+| Other GitHub Pages sites of the same account | All `perruccio.github.io/*` sites share the same origin and therefore the same browser storage. **Do not publish other Pages sites with third-party scripts**, or move the app to a dedicated origin (see below) |
+| GitHub account compromise (whoever gets it can change the app's code) | Two-factor authentication on the GitHub account (essential) |
 
-**Origine dedicata (consigliata).** Per isolare del tutto l'app, crea un'organizzazione GitHub gratuita (ad esempio `perruccio-learn`) e trasferisci lì `Learn-app`. L'app sarà su `perruccio-learn.github.io`, un'origine usata solo da lei.
+**Dedicated origin (recommended).** To isolate the app completely, create a free GitHub organization (for example `perruccio-learn`) and transfer `Learn-app` there. The app will be on `perruccio-learn.github.io`, an origin used only by it.
 
-### Difese tecniche
+### Technical defenses
 
-Un PDF è un file non fidato, quindi il reader adotta queste difese:
+A PDF is an untrusted file, so the reader applies these defenses:
 
-- **Il codice dei PDF non viene mai eseguito.** PDF.js gira senza motore di scripting, con `isEvalSupported: false` (la classe di attacchi di CVE-2024-4367) e con i moduli XFA disattivati. La versione inclusa (4.10.38) non è tra quelle colpite da CVE-2026-16633 (5.6.83–6.2.107), che comunque richiede lo scripting attivo.
-- **Content Security Policy rigida.** Possono girare solo gli script di questo sito, senza `unsafe-inline` né `unsafe-eval`, e l'unico server raggiungibile è `api.github.com`. Anche se un PDF o un file di annotazioni riuscisse a iniettare codice, il browser non lo eseguirebbe e non potrebbe inviare dati altrove.
-- **Link esterni sempre confermati.** Un link nel PDF mostra l'indirizzo completo e si apre solo dopo conferma, in una nuova scheda con `noopener` e `noreferrer`. I link `javascript:` vengono scartati.
-- **Markdown sicuro.** Le pagine sono costruite con le API del DOM, senza mai interpretare HTML: tag, script e link `javascript:`/`data:` presenti nei file restano testo. I link verso altri file del repository restano dentro l'app.
-- **Flashcard sicure.** Il testo delle carte è inserito come testo: sono ammessi solo `<b>`, `<i>`, `<u>`, `<code>` e `<br>`, ricostruiti senza attributi. Le formule passano da KaTeX con `trust: false` (niente `\href` o HTML). L'unica eccezione nella CSP è `style-src-attr 'unsafe-inline'`, necessaria a KaTeX per l'impaginazione delle formule: gli attributi di stile non possono eseguire codice.
-- **Annotazioni validate.** I file `.annotazioni.json` vengono letti con una whitelist: campi sconosciuti scartati, colori e tipi controllati, coordinate solo numeriche, testi con lunghezza massima. Tutto il testo viene inserito come testo, mai come HTML.
-- **Solo PDF veri.** Il caricamento controlla l'intestazione `%PDF-`, e un file che non è un PDF non viene aperto.
-- **Nessuna dipendenza esterna.** Nessuna CDN e nessun servizio di terze parti: tutto il codice è in questo repository.
-- **Token con accesso minimo.** Il token vale per un solo repository, con il solo permesso *Contents*, e resta nel browser del dispositivo.
+- **PDF code is never executed.** PDF.js runs without a scripting engine, with `isEvalSupported: false` (the attack class of CVE-2024-4367) and with XFA forms disabled. The bundled version (4.10.38) is not among those affected by CVE-2026-16633 (5.6.83–6.2.107), which in any case requires scripting to be enabled.
+- **Strict Content Security Policy.** Only this site's scripts can run, without `unsafe-inline` or `unsafe-eval`, and the only reachable server is `api.github.com`. Even if a PDF or an annotation file managed to inject code, the browser would not run it and it could not send data anywhere else.
+- **External links always confirmed.** A link in the PDF shows the full address and opens only after confirmation, in a new tab with `noopener` and `noreferrer`. `javascript:` links are discarded.
+- **Safe Markdown.** Pages are built with DOM APIs, never interpreting HTML: tags, scripts and `javascript:`/`data:` links in the files stay text. Links to other files of the repository stay inside the app.
+- **Safe flashcards.** Card text is inserted as text: only `<b>`, `<i>`, `<u>`, `<code>` and `<br>` are allowed, rebuilt without attributes. Formulas go through KaTeX with `trust: false` (no `\href` or HTML). The only exception in the CSP is `style-src-attr 'unsafe-inline'`, needed by KaTeX to lay out formulas: style attributes cannot run code.
+- **Validated annotations and state.** `.annotations.json`, `state.json` and `progress.json` files are read with a whitelist: unknown fields dropped, colors and types checked, coordinates numeric only, texts with a maximum length. All text is inserted as text, never as HTML.
+- **Real PDFs only.** Upload checks the `%PDF-` header, and a file that is not a PDF is not opened.
+- **No external dependencies.** No CDN and no third-party service: all the code is in this repository.
+- **Least-privilege token.** The token is valid for one repository only, with only the *Contents* permission, and stays in the device's browser.
 
-## Sviluppo
+## Development
 
-Sito statico, senza build: HTML, CSS e moduli JavaScript in `js/`. Librerie incluse in `vendor/`: PDF.js 4.10.38 (build *legacy*, Apache-2.0), KaTeX 0.18.11 (MIT, caricato solo nel ripasso), ts-fsrs 5.4.2 (MIT).
+Static site, no build: HTML, CSS and JavaScript modules in `js/`. Libraries bundled in `vendor/`: PDF.js 4.10.38 (*legacy* build, Apache-2.0), KaTeX 0.18.11 (MIT, loaded only when formulas are shown), ts-fsrs 5.4.2 (MIT).
 
 ```bash
-python -m http.server 8000   # poi apri http://localhost:8000
+python -m http.server 8000   # then open http://localhost:8000
 ```
 
-Prima di ogni commit: `python scripts/stamp.py`. Aggiunge una versione ricavata dal contenuto (`?v=…`) a moduli e fogli di stile e aggiorna `version.json`. GitHub Pages fa tenere i file in cache per circa 10 minuti: con la versione, i browser caricano subito il codice nuovo e l'app aperta si accorge da sola dell'aggiornamento.
+Before every commit: `python scripts/stamp.py`. It adds a content-derived version (`?v=…`) to modules and stylesheets and updates `version.json`. GitHub Pages lets files be cached for about 10 minutes: with the version, browsers load the new code right away and an open app notices the update on its own.
 
-### Test
+### Tests
 
-Test end-to-end con Playwright in `tests/` (dettagli in [`tests/README.md`](tests/README.md)): reader, sicurezza (PDF e markdown ostili, CSP), ripasso, pagine del corso, aggiornamento automatico. L'API di GitHub è simulata e i contenuti sono sintetici (`tests/fixtures/`): nel repo pubblico non entra niente del repo privato.
+End-to-end tests with Playwright in `tests/` (details in [`tests/README.md`](tests/README.md)): reader, security (hostile PDFs and markdown, CSP), review, course pages, automatic update. The GitHub API is mocked and the content is synthetic (`tests/fixtures/`): nothing from the private repo enters the public repo.
 
 ```bash
 cd tests && npm ci && npx playwright install chromium && npm test
 ```
 
-La CI (`.github/workflows/ci.yml`) esegue i test a ogni push e pull request e pubblica su GitHub Pages solo da `main` e solo se i test passano. Controlla anche che `scripts/stamp.py` sia stato eseguito. Le action sono fissate a commit SHA.
+CI (`.github/workflows/ci.yml`) runs the tests on every push and pull request and publishes to GitHub Pages only from `main` and only if the tests pass. It also checks that `scripts/stamp.py` was run. Actions are pinned to commit SHAs.

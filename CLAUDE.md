@@ -19,7 +19,7 @@ that can write to the private repo, so:
 - The token lives only in the browser (localStorage/sessionStorage); never log it or send it
   anywhere except `api.github.com`.
 - Add a test to `tests/e2e/security.mjs` (or the relevant suite) for every new input path.
-- The threat model is in `README.md` (section "Sicurezza"); update it when the attack surface changes.
+- The threat model is in `README.md` (section "Security"); update it when the attack surface changes.
 
 ## Constraints
 
@@ -45,13 +45,18 @@ into this public repo.
 
 ## Content formats the app relies on (defined in the Learn repo)
 
-- `matematica/PROGRESSI.md`: table rows `| [ ] | [S001](sessioni/S001.md) | LA-01 | Title |`;
-  a row without a link = session not prepared yet.
-- `matematica/sessioni/S###.md`: numbered sections `## 1 · Ripasso (10')` … `## 4 · Esercizi (25')`
-  become the stepper.
-- `matematica/flashcard/*.tsv`: Anki-style TSV with `#separator:tab` headers; session cards unlock
-  when the session is ticked. `ERR-*` and `EVID-*` files are always active.
-- `matematica/stato.json`, `flashcard/progresso.json`, `<pdf>.annotazioni.json`: written by the app.
+- `math/PROGRESS.md`: table rows `| [ ] | [S001](sessions/S001.md) | LinAlg-01 | Title |`;
+  a row without a link = session not prepared yet. Track codes are words before the dash
+  (`LinAlg`, `Prob`, `FuncAn`, `Stat`, `Opt`); anything else (e.g. `Mixed`) is grouped as `Mixed`.
+- `math/sessions/S###.md`: numbered sections `## 1 · Review (10')`, `## 2 · Pretest (3')`,
+  `## 3 · Theory (22')`, `## 4 · Exercises (25')` become the stepper (labels taken from the headings).
+  Solutions in `math/solutions/S###.md`, method pages in `math/method/`, roadmaps in `math/roadmap/`.
+- `math/flashcards/*.tsv`: Anki-style TSV with `#separator:tab` headers; session cards unlock
+  when the session is ticked. `ERR-*` and `HL-*` files (and legacy `EVID-*`) are always active.
+- `math/state.json`, `flashcards/progress.json`, `<pdf>.annotations.json`: written by the app.
+  Books in `math/books/` (default upload folder).
+- Hash routes: `#read=<pdf>&page=n`, `#doc=<md>`, `#path`, `#review`, `#setup`; the old `#percorso`
+  and `#ripasso` redirect to `#path` and `#review`.
 
 ## Repositories
 

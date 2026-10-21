@@ -26,7 +26,7 @@ npm test                          # all suites; or: node run-all.mjs course revi
 | Variable | Default | Meaning |
 |---|---|---|
 | `APP_URL` | `http://localhost:8765/` | app under test |
-| `CONTENT_DIR` | `fixtures/content` | Learn-like content root (contains `matematica/`) |
+| `CONTENT_DIR` | `fixtures/content` | Learn-like content root (contains `math/`) |
 | `PW_CHROMIUM_PATH` | Playwright's Chromium | browser binary |
 | `BIG_PDF` | unset | large PDF for `perf` |
 

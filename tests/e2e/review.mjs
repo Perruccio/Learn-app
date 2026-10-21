@@ -4,20 +4,24 @@ import crypto from 'crypto';
 import path from 'path';
 import { APP, ORIGIN, CONTENT_DIR, FIXTURES, SHOTS, devices, launch } from '../lib/env.mjs';
 
-const LEARN = path.join(CONTENT_DIR, 'matematica');
+const LEARN = path.join(CONTENT_DIR, 'math');
 const gitSha = (b) => crypto.createHash('sha1').update(Buffer.concat([Buffer.from(`blob ${b.length}\0`), b])).digest('hex');
 const repo = new Map();
 const put = (p, b) => repo.set(p, { buf: Buffer.from(b), sha: gitSha(Buffer.from(b)) });
-put('matematica/PROGRESSI.md', fs.readFileSync(`${LEARN}/PROGRESSI.md`));
-for (const f of fs.readdirSync(`${LEARN}/flashcard`)) put(`matematica/flashcard/${f}`, fs.readFileSync(`${LEARN}/flashcard/${f}`));
-put('matematica/libri/README.md', 'x');
+put('math/PROGRESS.md', fs.readFileSync(`${LEARN}/PROGRESS.md`));
+// Only session card files: the always-on files below are synthetic, so the counts are known.
+for (const f of fs.readdirSync(`${LEARN}/flashcards`).filter((f) => /^[A-Z]\d+\.tsv$/.test(f))) put(`math/flashcards/${f}`, fs.readFileSync(`${LEARN}/flashcards/${f}`));
+put('math/books/README.md', 'x');
 const cardLines = (file) => fs.readFileSync(file, 'utf8').split('\n').filter((l) => l.trim() && !l.startsWith('#')).length;
-const S001_CARDS = cardLines(`${LEARN}/flashcard/S001.tsv`);
-const CARD_FILES = fs.readdirSync(`${LEARN}/flashcard`).filter((f) => /^S\d+\.tsv$/.test(f)).map((f) => [f, fs.readFileSync(`${LEARN}/flashcard/${f}`, 'utf8')]);
+const S001_CARDS = cardLines(`${LEARN}/flashcards/S001.tsv`);
+const CARD_FILES = fs.readdirSync(`${LEARN}/flashcards`).filter((f) => /^S\d+\.tsv$/.test(f)).map((f) => [f, fs.readFileSync(`${LEARN}/flashcards/${f}`, 'utf8')]);
+// Always-on files: highlights (HL-, hostile content) and the legacy EVID- name.
 put(
-  'matematica/flashcard/EVID-test.tsv',
-  '#separator:tab\n#deck:Matematica::LA\n<img src=x onerror="window.__pwned=1">\\(x\\)\t<script>window.__pwned=1</script> \\(\\href{javascript:window.__pwned=1}{click}\\) <b>ok</b>\tEVID\n',
+  'math/flashcards/HL-test.tsv',
+  '#separator:tab\n#deck:Math::LinAlg\n<img src=x onerror="window.__pwned=1">\\(x\\)\t<script>window.__pwned=1</script> \\(\\href{javascript:window.__pwned=1}{click}\\) <b>ok</b>\thl:test\n',
 );
+put('math/flashcards/EVID-legacy.tsv', '#separator:tab\n#deck:Math::Prob\nLegacy highlight card?\tStill active\tevid:legacy\n');
+const ALWAYS_ON = 2;
 const puts = [];
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Authorization, Content-Type, Accept', 'Access-Control-Allow-Methods': 'GET, PUT, OPTIONS' };
 async function handle(route) {
@@ -63,20 +67,20 @@ async function device(opts) {
 const A = await device({ viewport: { width: 1200, height: 850 } });
 await A.page.waitForSelector('#next-session:not([hidden])');
 check('next session panel shows S001', (await A.page.textContent('#next-title')).startsWith('S001'), await A.page.textContent('#next-title'));
-check('session cards locked before the session is done (only the always-on EVID card)', (await A.page.textContent('#rv-new')) === '1', await A.page.textContent('#rv-new'));
+check('session cards locked before the session is done (only the always-on HL- and EVID- cards)', (await A.page.textContent('#rv-new')) === String(ALWAYS_ON), await A.page.textContent('#rv-new'));
 await A.page.screenshot({ path: `${SHOTS}/r1-library.png` });
 
 // Session pages need the markdown files in the mock repo
-put('matematica/sessioni/S001.md', fs.readFileSync(`${LEARN}/sessioni/S001.md`));
-await A.page.evaluate(() => (location.hash = '#doc=matematica/sessioni/S001.md'));
+put('math/sessions/S001.md', fs.readFileSync(`${LEARN}/sessions/S001.md`));
+await A.page.evaluate(() => (location.hash = '#doc=math/sessions/S001.md'));
 await A.page.waitForSelector('.session-end .btn-primary', { timeout: 15000 });
 await A.page.click('.session-end .btn-primary');
-await A.page.waitForSelector('.session-end .btn >> text=Completata');
+await A.page.waitForSelector('.session-end .btn >> text=✓ Done');
 await A.page.evaluate(() => (location.hash = ''));
 await A.page.waitForFunction(() => document.querySelector('#next-title').textContent.startsWith('S002'), null, { timeout: 15000 });
-check('PROGRESSI.md ticked on GitHub', /\| \[x\] \| \[S001\]/.test(repo.get('matematica/PROGRESSI.md').buf.toString()));
+check('PROGRESS.md ticked on GitHub', /\| \[x\] \| \[S001\]/.test(repo.get('math/PROGRESS.md').buf.toString()));
 const fresh = Number(await A.page.textContent('#rv-new'));
-check(`S001 cards unlocked (${S001_CARDS}) + always-on EVID file (1)`, fresh === S001_CARDS + 1, String(fresh));
+check(`S001 cards unlocked (${S001_CARDS}) + always-on HL-/EVID- files (${ALWAYS_ON})`, fresh === S001_CARDS + ALWAYS_ON, String(fresh));
 await A.page.screenshot({ path: `${SHOTS}/r2-library-unlocked.png` });
 
 // Review
@@ -114,7 +118,7 @@ const katexReport = await A.page.evaluate(async (files) => {
   const { renderRich, parseCardFile, loadMath } = await import('./js/cards.js'); await loadMath();
   const out = { cards: 0, errors: [], math: 0 };
   for (const [n, text] of files) {
-    for (const c of parseCardFile(text, `x/flashcard/${n}`)) {
+    for (const c of parseCardFile(text, `x/flashcards/${n}`)) {
       for (const side of [c.front, c.back]) {
         const div = document.createElement('div');
         renderRich(div, side);
@@ -132,10 +136,10 @@ check('all card formulas render with KaTeX', katexReport.errors.length === 0 && 
 await A.page.click('#review-finish');
 await A.page.waitForSelector('#view-library:not([hidden])');
 await A.page.waitForFunction(() => document.querySelector('[data-sync-pill]').dataset.state === 'synced', null, { timeout: 15000 });
-const prog = repo.get('matematica/flashcard/progresso.json');
+const prog = repo.get('math/flashcards/progress.json');
 const progJson = prog && JSON.parse(prog.buf.toString());
-check('progress pushed to progresso.json', progJson?.cards?.length === fresh, String(progJson?.cards?.length));
-check('progress pushed in few commits', puts.filter((p) => p.includes('progresso')).length <= 2, String(puts.filter((p) => p.includes('progresso')).length));
+check('progress pushed to progress.json', progJson?.cards?.length === fresh, String(progJson?.cards?.length));
+check('progress pushed in few commits', puts.filter((p) => p.includes('progress.json')).length <= 2, String(puts.filter((p) => p.includes('progress.json')).length));
 
 // Device B (phone) sees A's progress: nothing new left today
 const B = await device({ ...devices['iPhone 13'] });
@@ -150,8 +154,10 @@ await B.page.evaluate(() => {
   v.doc.cards.forEach((c) => (c.due = Date.now() - 1000));
   localStorage.setItem(k, JSON.stringify(v));
 });
+// The old #ripasso route still opens the review, under its new name
 await B.page.evaluate(() => (location.hash = '#ripasso'));
 await B.page.waitForSelector('#review-stage:not([hidden])');
+check('#ripasso redirects to #review', (await B.page.evaluate(() => location.hash)) === '#review', await B.page.evaluate(() => location.hash));
 await B.page.tap('#review-card');
 await B.page.waitForSelector('#review-ratings:not([hidden])');
 await B.page.screenshot({ path: `${SHOTS}/r6-phone-review.png` });

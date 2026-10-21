@@ -3,12 +3,12 @@
 // Annotation geometry is stored as fractions of the page box ([x, y, w, h] in
 // 0..1), so it is independent of zoom level and device.
 
-import { $, el, debounce, clamp, isNarrow, prettyName, storage, toast, uid } from './util.js?v=2b06f7adf1a7';
-import { liveAnnotations } from './sync.js?v=2b06f7adf1a7';
+import { $, el, debounce, clamp, isNarrow, prettyName, storage, toast, uid } from './util.js?v=424474b999d1';
+import { liveAnnotations } from './sync.js?v=424474b999d1';
 
 export const COLORS = ['yellow', 'green', 'blue', 'pink'];
-const COLOR_LABELS = { yellow: 'Giallo', green: 'Verde', blue: 'Blu', pink: 'Rosa' };
-const TYPE_LABELS = { highlight: 'Evidenziazione', area: 'Area', note: 'Nota' };
+const COLOR_LABELS = { yellow: 'Yellow', green: 'Green', blue: 'Blue', pink: 'Pink' };
+const TYPE_LABELS = { highlight: 'Highlight', area: 'Area', note: 'Note' };
 
 const VENDOR = new URL('../vendor/pdfjs/', import.meta.url).href;
 const PDF_CACHE = 'learn-reader-pdf-v1';
@@ -170,16 +170,16 @@ export class Reader {
     $('#reader-title').textContent = prettyName(file.path);
     document.title = `${prettyName(file.path)} · Learn Reader`;
     $('#annotation-count').textContent = '';
-    this._showLoading('Apro il libro…');
+    this._showLoading('Opening the book…');
 
     try {
       await loadPdfJs();
       const data = await loadPdfBytes(this.gh, file, (loaded, total) => {
         const mb = (n) => (n / 1048576).toFixed(1);
-        this._showLoading(total ? `Scarico il libro… ${mb(loaded)} / ${mb(total)} MB` : `Scarico il libro… ${mb(loaded)} MB`, total ? loaded / total : null);
+        this._showLoading(total ? `Downloading the book… ${mb(loaded)} / ${mb(total)} MB` : `Downloading the book… ${mb(loaded)} MB`, total ? loaded / total : null);
       });
       if (this.book !== file.path) return; // another book was opened meanwhile
-      this._showLoading('Apro il libro…');
+      this._showLoading('Opening the book…');
       const pdf = await pdfjsLib.getDocument({
         data,
         cMapUrl: `${VENDOR}cmaps/`,
@@ -225,7 +225,7 @@ export class Reader {
         .catch(() => {});
     } catch (err) {
       console.error(err);
-      this._showLoading(err.status === 404 ? 'Libro non trovato nel repository.' : `Impossibile aprire il libro: ${err.message}`, null, true);
+      this._showLoading(err.status === 404 ? 'Book not found in the repository.' : `Cannot open the book: ${err.message}`, null, true);
     }
   }
 
@@ -354,8 +354,8 @@ export class Reader {
             {
               class: `note-pin c-${a.color}${active}`,
               type: 'button',
-              title: a.note || 'Nota',
-              'aria-label': 'Apri nota',
+              title: a.note || 'Note',
+              'aria-label': 'Open note',
               dataset: { id: a.id },
               style: { left: `${a.x * 100}%`, top: `${a.y * 100}%` },
               onclick: (e) => {
@@ -419,9 +419,9 @@ export class Reader {
     });
     this.closePopover();
     const book = this.book;
-    toast('Annotazione eliminata', {
+    toast('Annotation deleted', {
       action: {
-        label: 'Annulla',
+        label: 'Undo',
         fn: () => this.sync.mutate(book, (d) => (d.annotations[id] = { ...snapshot, updatedAt: Date.now() })),
       },
     });
@@ -442,7 +442,7 @@ export class Reader {
     if (tool !== 'select') this._hideSelectionBar();
     const hint = $('#tool-hint');
     hint.hidden = tool === 'select';
-    hint.textContent = tool === 'area' ? 'Trascina sulla pagina per evidenziare un’area' : 'Tocca la pagina dove vuoi la nota';
+    hint.textContent = tool === 'area' ? 'Drag on the page to highlight an area' : 'Tap the page where you want the note';
   }
 
   // ------------------------------------------------------------------ text selection
@@ -458,8 +458,8 @@ export class Reader {
         el('button', {
           class: `swatch c-${color}`,
           type: 'button',
-          title: `Evidenzia (${COLOR_LABELS[color]})`,
-          'aria-label': `Evidenzia in ${COLOR_LABELS[color]}`,
+          title: `Highlight (${COLOR_LABELS[color]})`,
+          'aria-label': `Highlight in ${COLOR_LABELS[color].toLowerCase()}`,
           onclick: () => this._highlightSelection(color),
         }),
       );
@@ -616,7 +616,7 @@ export class Reader {
           return;
         }
         if (!['http:', 'https:', 'mailto:'].includes(url.protocol)) return;
-        if (confirm(`Il PDF contiene un link esterno:\n\n${url.href}\n\nAprirlo in una nuova scheda?`)) {
+        if (confirm(`The PDF contains an external link:\n\n${url.href}\n\nOpen it in a new tab?`)) {
           window.open(url.href, '_blank', 'noopener,noreferrer');
         }
       },
@@ -694,7 +694,7 @@ export class Reader {
     this.saveNote.flush();
     const previous = this.activeId;
     this.activeId = id;
-    $('#pop-meta').textContent = `${TYPE_LABELS[a.type] || 'Annotazione'} · p. ${a.page}`;
+    $('#pop-meta').textContent = `${TYPE_LABELS[a.type] || 'Annotation'} · p. ${a.page}`;
     const quote = $('#pop-quote');
     quote.textContent = a.text || '';
     quote.hidden = !a.text;
@@ -786,8 +786,8 @@ export class Reader {
         el('button', {
           class: `swatch swatch-sm c-${color}`,
           type: 'button',
-          title: `Colore: ${COLOR_LABELS[color]}`,
-          'aria-label': `Colore ${COLOR_LABELS[color]}`,
+          title: `Color: ${COLOR_LABELS[color]}`,
+          'aria-label': `Color ${COLOR_LABELS[color].toLowerCase()}`,
           dataset: { colorChoice: color },
           onclick: () => this.setColor(color),
         }),
@@ -1024,9 +1024,9 @@ export class Reader {
   _updateFindStatus(matchesCount, state) {
     const status = $('#find-status');
     if (state === 1 /* NOT_FOUND */ || (matchesCount && matchesCount.total === 0)) {
-      status.textContent = 'Nessun risultato';
+      status.textContent = 'No results';
     } else if (matchesCount?.total) {
-      status.textContent = `${matchesCount.current} di ${matchesCount.total}`;
+      status.textContent = `${matchesCount.current} of ${matchesCount.total}`;
     }
   }
 }

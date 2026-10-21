@@ -7,7 +7,7 @@ import { APP, FIXTURES, launch, reporter } from '../lib/env.mjs';
 
 const { check, finish } = reporter();
 const gitSha = (b) => crypto.createHash('sha1').update(Buffer.concat([Buffer.from(`blob ${b.length}\0`), b])).digest('hex');
-const repo = new Map([['matematica/PROGRESSI.md', Buffer.from('# Progressi\n')]]);
+const repo = new Map([['math/PROGRESS.md', Buffer.from('# Progress\n')]]);
 const blobs = new Map();
 const trees = new Map(); // tree sha -> { path, sha }
 let head = 'c0';
@@ -70,7 +70,7 @@ await page.fill('#setup-form [name=token]', 't');
 await page.click('#setup-submit');
 await page.waitForSelector('#view-library:not([hidden])');
 
-async function upload(files, folder = 'matematica/libri') {
+async function upload(files, folder = 'math/books') {
   await page.setInputFiles('#upload-input', files);
   await page.waitForSelector('#upload-dialog[open]');
   await page.fill('#upload-form [name=folder]', folder);
@@ -80,23 +80,24 @@ async function upload(files, folder = 'matematica/libri') {
 // A real PDF: blob, tree on the current head, commit, ref update (retried after a concurrent push)
 const pdf = fs.readFileSync(path.join(FIXTURES, 'book.pdf'));
 await upload({ name: 'All of Statistics.pdf', mimeType: 'application/pdf', buffer: pdf });
-await page.waitForFunction(() => /caricato/.test(document.querySelector('#toasts')?.textContent || ''), null, { timeout: 15000 });
-const stored = repo.get('matematica/libri/all-of-statistics.pdf');
+await page.waitForFunction(() => /uploaded/.test(document.querySelector('#toasts')?.textContent || ''), null, { timeout: 15000 });
+const stored = repo.get('math/books/all-of-statistics.pdf');
 check('PDF uploaded through the Git Data API, byte for byte', stored && stored.equals(pdf), String(stored?.length));
 check('contents endpoint not used for the upload', !calls.some((c) => c.startsWith('PUT /contents/')), calls.filter((c) => c.startsWith('PUT')).join(', '));
 check('concurrent push: commit rebuilt on the new head', commits.get(head).parents[0] === 'cX' && head !== 'cX', JSON.stringify(commits.get(head)));
+check('English commit message', commits.get(head).message === 'reader: add all-of-statistics.pdf', commits.get(head).message);
 check('blob sent once, even with the retry', calls.filter((c) => c === 'POST /git/blobs').length === 1);
 
 // Not a PDF
 const before = calls.length;
 await upload({ name: 'evil.pdf', mimeType: 'application/pdf', buffer: Buffer.from('<html><script>alert(1)</script></html>') });
-await page.waitForFunction(() => /non è un PDF/.test(document.querySelector('#toasts')?.textContent || ''), null, { timeout: 5000 });
+await page.waitForFunction(() => /not a valid PDF/.test(document.querySelector('#toasts')?.textContent || ''), null, { timeout: 5000 });
 check('non-PDF content rejected before any request', !calls.slice(before).some((c) => c.includes('/git/blobs')));
 
 // Path traversal in the folder field
 const before2 = calls.length;
-await upload({ name: 'x.pdf', mimeType: 'application/pdf', buffer: pdf }, 'matematica/../../etc');
-await page.waitForFunction(() => /Cartella non valida/.test(document.querySelector('#toasts')?.textContent || ''), null, { timeout: 5000 });
+await upload({ name: 'x.pdf', mimeType: 'application/pdf', buffer: pdf }, 'math/../../etc');
+await page.waitForFunction(() => /Invalid folder/.test(document.querySelector('#toasts')?.textContent || ''), null, { timeout: 5000 });
 check('folder with .. rejected', !calls.slice(before2).some((c) => c.includes('/git/blobs')));
 
 check('no JS errors', errors.length === 0, errors.join(' | '));

@@ -113,7 +113,7 @@ export function b64decodeUtf8(b64) {
   return new TextDecoder().decode(bytes);
 }
 
-/** "matematica/libri/axler-ladr-4ed.pdf" -> "Axler ladr 4ed" */
+/** "math/books/axler-ladr-4ed.pdf" -> "Axler ladr 4ed" */
 export function prettyName(path) {
   const base = path.split('/').pop().replace(/\.pdf$/i, '').replace(/[-_]+/g, ' ').trim();
   return base.charAt(0).toUpperCase() + base.slice(1);

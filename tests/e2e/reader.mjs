@@ -13,8 +13,8 @@ const repo = new Map(); // path -> {buf, sha}
 function putRepo(p, buf) {
   repo.set(p, { buf, sha: gitSha(buf) });
 }
-putRepo('matematica/libri/axler-ladr-4ed.pdf', fs.readFileSync(path.join(FIXTURES, 'book.pdf')));
-putRepo('matematica/libri/williams.pdf', fs.readFileSync(path.join(FIXTURES, 'book.pdf')));
+putRepo('math/books/axler-ladr-4ed.pdf', fs.readFileSync(path.join(FIXTURES, 'book.pdf')));
+putRepo('math/books/williams.pdf', fs.readFileSync(path.join(FIXTURES, 'book.pdf')));
 putRepo('README.md', Buffer.from('# Learn\n'));
 const log = [];
 let forceConflictOnce = false;
@@ -81,7 +81,7 @@ function check(name, cond, extra = '') {
   console.log(`${cond ? 'PASS' : 'FAIL'}  ${name}${extra ? `  (${extra})` : ''}`);
 }
 const remoteAnn = () => {
-  const e = repo.get('matematica/libri/axler-ladr-4ed.annotazioni.json');
+  const e = repo.get('math/books/axler-ladr-4ed.annotations.json');
   return e ? JSON.parse(e.buf.toString()) : null;
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -104,7 +104,7 @@ async function setup(page) {
   await page.waitForSelector('#view-library:not([hidden]) .book-card');
 }
 
-async function openBook(page, hash = '#read=matematica/libri/axler-ladr-4ed.pdf') {
+async function openBook(page, hash = '#read=math/books/axler-ladr-4ed.pdf') {
   await page.evaluate((h) => (location.hash = h), hash);
   await page.waitForSelector('#viewer .page[data-page-number="1"] .textLayer span', { timeout: 20000 });
   await page.waitForFunction(() => document.querySelector('#reader-loading').hidden);
@@ -187,7 +187,7 @@ await A.page.selectOption('#zoom-select', 'auto');
 // 3. Note on a highlight via popover
 await A.page.click('.page[data-page-number="1"] .hl-text', { force: true });
 await A.page.waitForSelector('#popover:not([hidden])');
-await A.page.fill('#pop-note', 'Definizione chiave: rivedere gli assiomi');
+await A.page.fill('#pop-note', 'Key definition: review the axioms');
 await A.page.click('#pop-done');
 check('popover closes', await A.page.$eval('#popover', (e) => e.hidden));
 
@@ -210,7 +210,7 @@ await A.page.mouse.click(p2.x + p2.width * 0.8, p2.y + p2.height * 0.2);
 await A.page.waitForSelector('#popover:not([hidden])');
 await sleep(100);
 check('note popover focused', await A.page.evaluate(() => document.activeElement?.id === 'pop-note'));
-await A.page.keyboard.type('Esercizio 3 non chiaro');
+await A.page.keyboard.type('Exercise 3 unclear');
 await sleep(700);
 check('popover still open after typing (no stray click close)', await A.page.$eval('#popover', (e) => !e.hidden));
 await A.page.keyboard.press('Escape');
@@ -230,12 +230,12 @@ await A.page.click('[data-panel-tab="search"]');
 await A.page.fill('#find-input', 'vector space');
 await A.page.press('#find-input', 'Enter');
 await sleep(1200);
-check('search finds matches', /di \d+/.test(await A.page.textContent('#find-status')), await A.page.textContent('#find-status'));
+check('search finds matches', /of \d+/.test(await A.page.textContent('#find-status')), await A.page.textContent('#find-status'));
 await A.page.click('#panel-close');
 
 await A.page.waitForFunction(() => document.querySelector('[data-sync-pill]').dataset.state === 'synced', null, { timeout: 15000 });
 remote = remoteAnn();
-check('remote has 3 annotations incl. notes', remote.annotations.length === 3 && remote.annotations.some((a) => a.note === 'Definizione chiave: rivedere gli assiomi') && remote.annotations.some((a) => a.type === 'note' && a.note === 'Esercizio 3 non chiaro'));
+check('remote has 3 annotations incl. notes', remote.annotations.length === 3 && remote.annotations.some((a) => a.note === 'Key definition: review the axioms') && remote.annotations.some((a) => a.type === 'note' && a.note === 'Exercise 3 unclear'));
 
 // 7. Reading position is synced when leaving the book
 await A.page.fill('#page-input', '4');
@@ -245,7 +245,7 @@ await A.page.click('#btn-back');
 await A.page.waitForSelector('#view-library:not([hidden])');
 await A.page.waitForFunction(() => document.querySelector('[data-sync-pill]').dataset.state === 'synced', null, { timeout: 15000 });
 check('remote lastPage = 4', remoteAnn().lastPage?.page === 4, JSON.stringify(remoteAnn().lastPage));
-check('library shows page and count', /p\. 4 · 3 annotazioni/.test(await A.page.textContent('.book-card')), await A.page.textContent('.book-card'));
+check('library shows page and count', /p\. 4 · 3 annotations/.test(await A.page.textContent('.book-card')), await A.page.textContent('.book-card'));
 
 // Device B: phone
 const B = await newDevice(browser, { ...devices['iPhone 13'], hasTouch: true });
@@ -269,7 +269,7 @@ check('device B has all 3 annotations locally', storedB === 3, String(storedB));
 await openBook(A.page);
 await selectText(A.page, 1, 3, 0, 30);
 await A.page.click('#selection-bar .swatch.c-green');
-await B.page.evaluate(() => (location.hash = '#read=matematica/libri/axler-ladr-4ed.pdf&page=1'));
+await B.page.evaluate(() => (location.hash = '#read=math/books/axler-ladr-4ed.pdf&page=1'));
 await sleep(800);
 await selectText(B.page, 1, 5, 0, 25);
 await B.page.screenshot({ path: `${SHOTS}/05-phone-selection.png` });
@@ -318,15 +318,15 @@ await A.page.waitForFunction(() => document.querySelector('[data-sync-pill]').da
 check('offline highlight synced after reconnect', remoteAnn().annotations.some((a) => a.color === 'pink' && !a.deleted));
 
 // 11. Deep link with page
-await A.page.evaluate(() => (location.hash = '#read=matematica/libri/williams.pdf&page=3'));
+await A.page.evaluate(() => (location.hash = '#read=math/books/williams.pdf&page=3'));
 await A.page.waitForSelector('#viewer .page[data-page-number="3"]');
 await sleep(800);
 check('deep link opens other book at page 3', Number(await A.page.inputValue('#page-input')) === 3);
 
 // 12. Missing book message
-await A.page.evaluate(() => (location.hash = '#read=matematica/libri/missing.pdf'));
+await A.page.evaluate(() => (location.hash = '#read=math/books/missing.pdf'));
 await A.page.waitForSelector('#reader-loading.is-error:not([hidden])');
-check('missing book shows a clear error', /non è nel repository/.test(await A.page.textContent('#reader-loading-text')));
+check('missing book shows a clear error', /not in the repository/.test(await A.page.textContent('#reader-loading-text')));
 
 // 13. Second open uses the device cache (no blob download)
 const blobBefore = log.filter((l) => l.includes('/git/blobs/')).length;
@@ -348,12 +348,32 @@ await A.page.screenshot({ path: `${SHOTS}/06-reader.png` });
 check('no JS errors on A', A.errors.length === 0, A.errors.join(' | '));
 check('no JS errors on B', B.errors.length === 0, B.errors.join(' | '));
 
+// 15. Unsynced local edits saved under the old Italian layout (matematica/libri/...) move to the new paths
+const D = await newDevice(browser, { viewport: { width: 1000, height: 800 } });
+await D.ctx.addInitScript(() => {
+  if (localStorage.getItem('learnreader:config')) return;
+  localStorage.setItem('learnreader:config', JSON.stringify({ owner: 'Perruccio', repo: 'Learn', branch: 'main', token: 'good-token' }));
+  const doc = { version: 1, book: 'matematica/libri/axler-ladr-4ed.pdf', lastPage: null, annotations: [{ id: 'legacy1', type: 'highlight', page: 2, color: 'blue', rects: [[0.1, 0.1, 0.2, 0.02]], createdAt: 1, updatedAt: Date.now() }] };
+  localStorage.setItem('learnreader:doc:Perruccio/Learn@main:matematica/libri/axler-ladr-4ed.pdf', JSON.stringify({ doc, dirty: true, rev: 1 }));
+  localStorage.setItem('learnreader:zoom:matematica/libri/axler-ladr-4ed.pdf', JSON.stringify('page-fit'));
+});
+await D.page.goto(APP);
+await D.page.waitForSelector('#view-library:not([hidden]) .book-card');
+await D.page.waitForFunction(() => document.querySelector('[data-sync-pill]').dataset.state === 'synced', null, { timeout: 15000 });
+const legacyKeys = await D.page.evaluate(() => Object.keys(localStorage).filter((k) => k.includes('matematica')));
+check(
+  'legacy local edits pushed to the new path, old keys gone',
+  remoteAnn().annotations.some((a) => a.id === 'legacy1') && ![...repo.keys()].some((k) => k.startsWith('matematica/')) && legacyKeys.length === 0,
+  legacyKeys.join(', '),
+);
+check('no JS errors on D', D.errors.length === 0, D.errors.join(' | '));
+
 // dark-mode screenshot of library on phone
 const C = await newDevice(browser, { ...devices['iPhone 13'], colorScheme: 'dark' });
 await setup(C.page);
 await C.page.screenshot({ path: `${SHOTS}/07-phone-library-dark.png` });
 
-fs.writeFileSync(`${SHOTS}/remote.json`, repo.get('matematica/libri/axler-ladr-4ed.annotazioni.json').buf);
+fs.writeFileSync(`${SHOTS}/remote.json`, repo.get('math/books/axler-ladr-4ed.annotations.json').buf);
 await browser.close();
 const failed = results.filter((r) => !r.ok);
 console.log(`\n${results.length - failed.length}/${results.length} passed`);

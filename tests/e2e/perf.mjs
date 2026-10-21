@@ -15,7 +15,7 @@ async function handle(route) {
   const json = (s, b) => route.fulfill({ status: s, headers: { ...CORS, 'Content-Type': 'application/json' }, body: JSON.stringify(b) });
   if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS });
   if (p === '/repos/Perruccio/Learn') return json(200, {});
-  if (p.endsWith('/git/trees/main')) return json(200, { tree: [{ path: 'matematica/libri/big.pdf', type: 'blob', sha, size: buf.length }] });
+  if (p.endsWith('/git/trees/main')) return json(200, { tree: [{ path: 'math/books/big.pdf', type: 'blob', sha, size: buf.length }] });
   if (p.includes('/git/blobs/')) return route.fulfill({ status: 200, headers: { ...CORS, 'Content-Length': String(buf.length) }, body: buf });
   const f = p.split('/contents/')[1];
   if (req.method() === 'GET') return files.has(f) ? json(200, { sha: 'x' + files.get(f).length, content: Buffer.from(files.get(f)).toString('base64') }) : json(404, {});

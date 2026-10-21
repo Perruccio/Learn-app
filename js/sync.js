@@ -1,11 +1,11 @@
 // Local-first annotation store with background sync to GitHub.
 //
-// Every book has one JSON file next to the PDF ("<name>.annotazioni.json").
+// Every book has one JSON file next to the PDF ("<name>.annotations.json").
 // Edits are written to localStorage immediately; a debounced background sync
 // pulls the remote file, merges per annotation (newest `updatedAt` wins,
 // deletions are kept as tombstones) and pushes the result.
 
-import { storage, prettyName } from './util.js?v=2b06f7adf1a7';
+import { storage, prettyName } from './util.js?v=424474b999d1';
 
 const DOC_VERSION = 1;
 const TOMBSTONE_TTL_MS = 180 * 24 * 3600 * 1000;
@@ -13,7 +13,7 @@ const AUTO_SYNC_DELAY_MS = 4000;
 const MAX_ATTEMPTS = 4;
 
 export function annotationPath(pdfPath) {
-  return pdfPath.replace(/\.pdf$/i, '') + '.annotazioni.json';
+  return pdfPath.replace(/\.pdf$/i, '') + '.annotations.json';
 }
 
 export function emptyDoc(book) {
@@ -143,8 +143,42 @@ export const annotationCodec = {
   serialize: serializeDoc,
   isEmpty: isEmptyDoc,
   toStorage: (doc) => ({ ...doc, annotations: Object.values(doc.annotations) }),
-  message: (book) => `reader: annotazioni ${prettyName(book)}`,
+  message: (book) => `reader: annotations ${prettyName(book)}`,
 };
+
+// ------------------------------------------------------------------ local data under old (Italian) paths
+
+const LEGACY_SEGMENTS = { matematica: 'math', libri: 'books', flashcard: 'flashcards' };
+
+/** New path for a path of the old Italian content layout ("matematica/libri/x.pdf" -> "math/books/x.pdf"), else null. */
+export function legacyPath(path) {
+  if (!/^matematica(\/|$)/.test(path)) return null;
+  const parts = path.split('/');
+  const last = /\.[a-z]+$/i.test(parts[parts.length - 1]) ? parts.length - 1 : parts.length; // keep file names
+  return parts.map((p, i) => (i < last && Object.hasOwn(LEGACY_SEGMENTS, p) ? LEGACY_SEGMENTS[p] : p)).join('/');
+}
+
+/**
+ * The content repository moved to English names. Move local documents (annotations,
+ * review state, course state, zoom) stored under old paths to the new ones, so that
+ * pending edits are pushed to the new files instead of recreating the old folders.
+ * Cached file lists with old paths are dropped (they are fetched again).
+ */
+export function migrateLegacyStorage() {
+  for (const key of storage.keys('learnreader:')) {
+    const m = key.match(/^(learnreader:(?:(?:doc|cards|state):[^:]+:|zoom:))(.+)$/);
+    if (m) {
+      const to = legacyPath(m[2]);
+      if (!to) continue;
+      const value = storage.get(key);
+      if (storage.get(m[1] + to) === null && value !== null) storage.set(m[1] + to, value);
+      storage.remove(key);
+    } else if (key.startsWith('learnreader:files:')) {
+      const files = storage.get(key);
+      if (Array.isArray(files) && files.some((f) => legacyPath(String(f?.path || '')))) storage.remove(key);
+    }
+  }
+}
 
 export function liveAnnotations(doc) {
   return Object.values(doc.annotations).filter((a) => !a.deleted).sort(byPosition);
@@ -192,7 +226,7 @@ export class SyncManager extends EventTarget {
       dirty,
       rev,
     });
-    if (!ok) this.lastError = 'Spazio locale pieno: sincronizza appena possibile';
+    if (!ok) this.lastError = 'Local storage full: sync as soon as possible';
     if (dirty) this.dirty.add(book);
     else {
       this.dirty.delete(book);
@@ -299,7 +333,7 @@ export class SyncManager extends EventTarget {
       if (stillDirty) this.schedule(book, 1000);
       return finalDoc;
     }
-    throw new Error('Troppi conflitti di sincronizzazione, riprovo più tardi');
+    throw new Error('Too many sync conflicts, will retry later');
   }
 
   /** Sync every book with local changes (app start, leaving the page, back online). */
@@ -309,12 +343,12 @@ export class SyncManager extends EventTarget {
   }
 
   status() {
-    if (this.running.size) return { state: 'syncing', message: 'Sincronizzo…' };
-    if (this.lastError === 'offline') return { state: 'offline', message: 'Offline: salvato in locale' };
+    if (this.running.size) return { state: 'syncing', message: 'Syncing…' };
+    if (this.lastError === 'offline') return { state: 'offline', message: 'Offline: saved locally' };
     if (this.lastError) return { state: 'error', message: this.lastError };
     const pending = this.dirtyBooks().some((b) => !this.positionOnly.has(b));
-    if (this.timers.size || pending) return { state: 'pending', message: 'Salvato in locale' };
-    return { state: 'synced', message: 'Sincronizzato' };
+    if (this.timers.size || pending) return { state: 'pending', message: 'Saved locally' };
+    return { state: 'synced', message: 'Synced' };
   }
 
   _updateStatus() {

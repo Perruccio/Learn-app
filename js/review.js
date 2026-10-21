@@ -1,6 +1,6 @@
 // Flashcard review session (spaced repetition with FSRS).
 
-import { $, el, clamp, toast } from './util.js?v=2b06f7adf1a7';
+import { $, el, clamp, toast } from './util.js?v=424474b999d1';
 import {
   NEW_PER_DAY,
   Rating,
@@ -15,13 +15,13 @@ import {
   renderRich,
   scheduler,
   toFsrsCard,
-} from './cards.js?v=2b06f7adf1a7';
+} from './cards.js?v=424474b999d1';
 
 const RATINGS = [
-  { rating: Rating.Again, label: 'Di nuovo', key: '1', cls: 'again' },
-  { rating: Rating.Hard, label: 'Difficile', key: '2', cls: 'hard' },
-  { rating: Rating.Good, label: 'Bene', key: '3', cls: 'good' },
-  { rating: Rating.Easy, label: 'Facile', key: '4', cls: 'easy' },
+  { rating: Rating.Again, label: 'Again', key: '1', cls: 'again' },
+  { rating: Rating.Hard, label: 'Hard', key: '2', cls: 'hard' },
+  { rating: Rating.Good, label: 'Good', key: '3', cls: 'good' },
+  { rating: Rating.Easy, label: 'Easy', key: '4', cls: 'easy' },
 ];
 const REQUEUE_WINDOW_MS = 20 * 60 * 1000;
 
@@ -229,17 +229,17 @@ export class ReviewSession {
     const card = this.current;
     $('#review-undo').disabled = this.history.length === 0;
     const remaining = this.queue.length + (card ? 1 : 0);
-    $('#review-count').textContent = card ? `${remaining} da fare · ${this.done} fatte` : '';
+    $('#review-count').textContent = card ? `${remaining} left · ${this.done} done` : '';
     $('#review-done').hidden = !!card;
     $('#review-stage').hidden = !card;
     if (!card) {
       $('#review-done-text').textContent =
-        this.done === 0 ? 'Niente da ripassare adesso.' : `Hai ripassato ${this.done} ${this.done === 1 ? 'carta' : 'carte'}.`;
+        this.done === 0 ? 'Nothing to review right now.' : `You reviewed ${this.done} ${this.done === 1 ? 'card' : 'cards'}.`;
       return;
     }
     const doc = this.sync.load(card.dir).doc;
     const s = doc.cards[card.id];
-    $('#review-meta').textContent = [card.deck, card.stem, isNew(s) ? 'nuova' : null].filter(Boolean).join(' · ');
+    $('#review-meta').textContent = [card.deck, card.stem, isNew(s) ? 'new' : null].filter(Boolean).join(' · ');
     renderRich($('#review-front'), card.front);
     const back = $('#review-back-text');
     back.hidden = !this.revealed;
@@ -259,5 +259,5 @@ export class ReviewSession {
 }
 
 export function warnIfLocked(decks) {
-  if (!decks.cards.length && decks.locked) toast('Le carte si sbloccano quando segni come fatta la sessione corrispondente.');
+  if (!decks.cards.length && decks.locked) toast('Cards unlock when you mark their session as done.');
 }

@@ -1,15 +1,15 @@
 // App shell: configuration, routing, library and sync triggers.
 
-import { $, el, debounce, dirName, formatSize, prettyName, storage, toast } from './util.js?v=2b06f7adf1a7';
-import { GitHub } from './github.js?v=2b06f7adf1a7';
-import { SyncManager, liveAnnotations } from './sync.js?v=2b06f7adf1a7';
-import { Reader, isPdfCached } from './reader.js?v=2b06f7adf1a7';
-import { loadDecks, loadMath, progressCodec, tickSession } from './cards.js?v=2b06f7adf1a7';
-import { ReviewSession, summarize } from './review.js?v=2b06f7adf1a7';
-import { Course, skipOf, stateCodec } from './course.js?v=2b06f7adf1a7';
+import { $, el, debounce, dirName, formatSize, prettyName, storage, toast } from './util.js?v=424474b999d1';
+import { GitHub } from './github.js?v=424474b999d1';
+import { SyncManager, liveAnnotations, migrateLegacyStorage } from './sync.js?v=424474b999d1';
+import { Reader, isPdfCached } from './reader.js?v=424474b999d1';
+import { loadDecks, loadMath, progressCodec, tickSession } from './cards.js?v=424474b999d1';
+import { ReviewSession, summarize } from './review.js?v=424474b999d1';
+import { Course, skipOf, stateCodec } from './course.js?v=424474b999d1';
 
 // Stamped by scripts/stamp.py on every release (do not edit by hand).
-const APP_VERSION = '2b06f7adf1a7';
+const APP_VERSION = '424474b999d1';
 const CONFIG_KEY = 'learnreader:config';
 const MAX_UPLOAD_BYTES = 95 * 1024 * 1024;
 
@@ -66,7 +66,7 @@ function connect(cfg) {
   for (const manager of [app.sync, app.cards, app.state]) {
     manager.addEventListener('status', () => renderSyncStatus());
     manager.addEventListener('unauthorized', () => {
-      toast('Token non valido o scaduto: ricollega il repository', { error: true, ms: 6000 });
+      toast('Invalid or expired token: reconnect the repository', { error: true, ms: 6000 });
       location.hash = 'setup';
     });
   }
@@ -78,7 +78,7 @@ function connect(cfg) {
 }
 
 function pdfsOf(files) {
-  return files.filter((f) => /\.pdf$/i.test(f.path)).sort((a, b) => a.path.localeCompare(b.path, 'it'));
+  return files.filter((f) => /\.pdf$/i.test(f.path)).sort((a, b) => a.path.localeCompare(b.path, 'en'));
 }
 
 function filesKey() {
@@ -92,19 +92,31 @@ function showView(name) {
   document.body.dataset.view = name;
 }
 
+// Old Italian routes, kept so that existing bookmarks and links keep working.
+const HASH_ALIASES = { ripasso: 'review', percorso: 'path' };
+
+/** Rewrite an old route (#ripasso, #percorso) to its current name, without adding a history entry. */
+function redirectAlias() {
+  const name = location.hash.slice(1).split('&')[0];
+  if (!Object.hasOwn(HASH_ALIASES, name)) return;
+  const rest = location.hash.slice(1 + name.length);
+  history.replaceState(history.state, '', `${location.pathname}${location.search}#${HASH_ALIASES[name]}${rest}`);
+}
+
 function parseHash() {
   const params = new URLSearchParams(location.hash.slice(1));
   return {
     read: params.get('read'),
     page: parseInt(params.get('page'), 10) || null,
     setup: params.has('setup'),
-    review: params.has('ripasso'),
-    progress: params.has('percorso'),
+    review: params.has('review'),
+    progress: params.has('path'),
     doc: params.get('doc'),
   };
 }
 
 async function route() {
+  redirectAlias();
   const { read, page, setup, review, progress, doc } = parseHash();
   if (!app.cfg || setup) {
     await app.reader?.close();
@@ -147,7 +159,7 @@ async function openBook(path, page) {
   if (!file) {
     await app.reader.close();
     $('#reader-title').textContent = prettyName(path);
-    app.reader._showLoading(`Il libro «${path}» non è nel repository. Caricalo dalla libreria con il pulsante ↑.`, null, true);
+    app.reader._showLoading(`The book “${path}” is not in the repository. Upload it from the library with the ↑ button.`, null, true);
     return;
   }
   await app.reader.open(file, { page });
@@ -157,14 +169,14 @@ async function openBook(path, page) {
 
 function showSetup() {
   showView('setup');
-  document.title = 'Learn Reader · Impostazioni';
+  document.title = 'Learn Reader · Settings';
   const form = $('#setup-form');
   if (app.cfg) {
     form.repo.value = `${app.cfg.owner}/${app.cfg.repo}`;
     form.branch.value = app.cfg.branch;
     form.token.value = '';
     form.token.required = false;
-    form.token.placeholder = 'Lascia vuoto per mantenere il token attuale';
+    form.token.placeholder = 'Leave empty to keep the current token';
   }
   $('#setup-cancel').hidden = !app.cfg;
   $('#setup-logout').hidden = !app.cfg;
@@ -181,7 +193,7 @@ function bindSetup() {
     const error = $('#setup-error');
     const button = $('#setup-submit');
     button.disabled = true;
-    button.textContent = 'Verifico…';
+    button.textContent = 'Checking…';
     error.hidden = true;
     try {
       await new GitHub(cfg).checkAccess();
@@ -192,22 +204,22 @@ function bindSetup() {
     } catch (err) {
       error.textContent =
         err.status === 401
-          ? 'Token non valido.'
+          ? 'Invalid token.'
           : err.status === 404
-            ? 'Repository non trovato, oppure il token non ha accesso a questo repository.'
+            ? 'Repository not found, or the token has no access to it.'
             : err.status === 0
-              ? 'Nessuna connessione a internet.'
+              ? 'No internet connection.'
               : err.message;
       error.hidden = false;
     } finally {
       button.disabled = false;
-      button.textContent = 'Connetti';
+      button.textContent = 'Connect';
     }
   });
   $('#setup-cancel').addEventListener('click', () => (location.hash = ''));
   $('#setup-logout').addEventListener('click', () => {
     const pending = app.sync?.dirtyBooks().length || 0;
-    if (pending && !confirm(`Ci sono annotazioni non ancora sincronizzate in ${pending} libri. Disconnettere comunque? Restano salvate su questo dispositivo.`)) return;
+    if (pending && !confirm(`${pending} ${pending === 1 ? 'book has' : 'books have'} annotations not synced yet. Disconnect anyway? They stay saved on this device.`)) return;
     forgetConfig();
     app.cfg = null;
     location.hash = 'setup';
@@ -219,7 +231,7 @@ function bindSetup() {
 
 async function refreshFiles() {
   const { files, truncated } = await app.gh.listFiles();
-  if (truncated) toast('Repository molto grande: alcuni file potrebbero non comparire', { error: true });
+  if (truncated) toast('Very large repository: some files may be missing', { error: true });
   // Keep only what the app uses: PDFs, card files and progress tables.
   const relevant = files.filter((f) => /\.(pdf|tsv|md)$/i.test(f.path));
   app.allFiles = relevant;
@@ -235,7 +247,7 @@ async function renderLibrary() {
   if (app.files) {
     drawLibrary();
     renderHomePanels({ pull: false });
-  } else list.replaceChildren(el('p', { class: 'muted lib-empty' }, 'Carico la libreria…'));
+  } else list.replaceChildren(el('p', { class: 'muted lib-empty' }, 'Loading the library…'));
   try {
     await refreshFiles();
     $('#library-offline').hidden = true;
@@ -247,7 +259,7 @@ async function renderLibrary() {
       $('#library-offline').hidden = err.status !== 0;
       if (err.status !== 0) toast(err.message, { error: true });
     } else {
-      list.replaceChildren(el('p', { class: 'form-error lib-empty' }, err.status === 0 ? 'Sei offline e la libreria non è ancora mai stata caricata.' : err.message));
+      list.replaceChildren(el('p', { class: 'form-error lib-empty' }, err.status === 0 ? 'You are offline and the library has never been loaded yet.' : err.message));
     }
   }
 }
@@ -261,19 +273,19 @@ function drawLibrary() {
       el(
         'div',
         { class: 'lib-empty' },
-        el('p', {}, 'Nessun PDF nel repository.'),
-        el('p', { class: 'muted' }, 'Aggiungi i libri con il pulsante ↑ in alto, oppure caricali nella cartella ', el('code', {}, 'matematica/libri'), ' del repository.'),
+        el('p', {}, 'No PDFs in the repository.'),
+        el('p', { class: 'muted' }, 'Add books with the ↑ button above, or upload them to the ', el('code', {}, 'math/books'), ' folder of the repository.'),
       ),
     );
     return;
   }
   if (!files.length) {
-    list.replaceChildren(el('p', { class: 'muted lib-empty' }, 'Nessun libro corrisponde alla ricerca.'));
+    list.replaceChildren(el('p', { class: 'muted lib-empty' }, 'No book matches the search.'));
     return;
   }
   const groups = new Map();
   for (const f of files) {
-    const dir = dirName(f.path) || '(radice)';
+    const dir = dirName(f.path) || '(root)';
     if (!groups.has(dir)) groups.set(dir, []);
     groups.get(dir).push(f);
   }
@@ -293,8 +305,8 @@ function drawLibrary() {
             const count = liveAnnotations(doc).length;
             const meta = [formatSize(f.size)];
             if (doc.lastPage) meta.push(`p. ${doc.lastPage.page}`);
-            if (count) meta.push(count === 1 ? '1 annotazione' : `${count} annotazioni`);
-            const offline = el('span', { class: 'badge-offline', hidden: true, title: 'Disponibile offline' }, 'offline');
+            if (count) meta.push(count === 1 ? '1 annotation' : `${count} annotations`);
+            const offline = el('span', { class: 'badge-offline', hidden: true, title: 'Available offline' }, 'offline');
             isPdfCached(f.sha).then((yes) => (offline.hidden = !yes));
             return el(
               'li',
@@ -307,7 +319,7 @@ function drawLibrary() {
                   'span',
                   { class: 'book-info' },
                   el('span', { class: 'book-title' }, prettyName(f.path)),
-                  el('span', { class: 'book-meta' }, meta.join(' · '), dirty.has(f.path) && el('span', { class: 'dot-pending', title: 'Modifiche da sincronizzare' }), offline),
+                  el('span', { class: 'book-meta' }, meta.join(' · '), dirty.has(f.path) && el('span', { class: 'dot-pending', title: 'Changes to sync' }), offline),
                 ),
               ),
             );
@@ -343,7 +355,7 @@ async function renderHomePanels({ pull = true } = {}) {
   $('#next-session').hidden = !next;
   if (next) {
     $('#next-title').textContent = `${next.id} · ${next.title}`;
-    $('#next-meta').textContent = `${next.track} · ${rows.filter((r) => r.done).length} di ${rows.length} completate`;
+    $('#next-meta').textContent = `${next.track} · ${rows.filter((r) => r.done).length} of ${rows.length} done`;
     const link = next.link ? `#doc=${base ? `${base}/` : ''}${next.link}` : null;
     $('#next-open').hidden = !link;
     if (link) $('#next-open').href = link;
@@ -369,9 +381,9 @@ function drawReviewPanel(decks) {
     .map(([deck, c]) => `${deck} ${c.due + c.fresh}`);
   $('#rv-decks').textContent = decks.cards.length
     ? parts.length
-      ? `Per filone: ${parts.join(' · ')}`
-      : 'Tutto ripassato per oggi.'
-    : 'Le carte di una sessione si sbloccano quando la segni come fatta.';
+      ? `By track: ${parts.join(' · ')}`
+      : 'All reviewed for today.'
+    : 'A session’s cards unlock when you mark it as done.';
   $('#rv-start').classList.toggle('is-disabled', s.due + s.fresh === 0);
 }
 
@@ -383,24 +395,24 @@ async function openCourse(docPath) {
     document.title = `${text} · Learn Reader`;
   };
   $('#course-back').onclick = () => {
-    if (docPath && /\/sessioni\//.test(docPath)) location.hash = 'percorso';
-    else if (docPath) history.length > 1 ? history.back() : (location.hash = 'percorso');
+    if (docPath && /\/sessions\//.test(docPath)) location.hash = 'path';
+    else if (docPath) history.length > 1 ? history.back() : (location.hash = 'path');
     else location.hash = '';
   };
   try {
     if (!app.allFiles) await refreshFiles();
   } catch (err) {
     if (!app.allFiles) {
-      main.replaceChildren(el('p', { class: 'form-error' }, err.status === 0 ? 'Offline e contenuti non ancora scaricati.' : err.message));
+      main.replaceChildren(el('p', { class: 'form-error' }, err.status === 0 ? 'Offline, and the content has not been downloaded yet.' : err.message));
       return;
     }
   }
   main.scrollTop = 0;
   if (!docPath) {
-    setTitle('Percorso');
+    setTitle('Path');
     await app.course.renderProgress(main);
     // Pull checklist state from other devices, then refresh the view.
-    const bases = [...new Set(app.allFiles.filter((f) => /(^|\/)PROGRESSI\.md$/.test(f.path)).map((f) => dirName(f.path)))];
+    const bases = [...new Set(app.allFiles.filter((f) => /(^|\/)PROGRESS\.md$/.test(f.path)).map((f) => dirName(f.path)))];
     Promise.allSettled(bases.map((b) => app.state.sync(b))).then(() => {
       if (parseHash().progress) app.course.renderProgress(main);
     });
@@ -411,14 +423,14 @@ async function openCourse(docPath) {
     await refreshFiles().catch(() => {});
   }
   await app.course.renderDoc(main, docPath, { title: setTitle });
-  const sessionBase = /\/sessioni\//.test(docPath) ? dirName(dirName(docPath)) : null;
+  const sessionBase = /\/sessions\//.test(docPath) ? dirName(dirName(docPath)) : null;
   if (sessionBase !== null) app.state.sync(sessionBase).catch(() => {});
 }
 
 async function startReview() {
   showView('review');
-  document.title = 'Ripasso · Learn Reader';
-  $('#review-count').textContent = 'Carico le carte…';
+  document.title = 'Review · Learn Reader';
+  $('#review-count').textContent = 'Loading cards…';
   $('#review-stage').hidden = true;
   $('#review-done').hidden = true;
   try {
@@ -426,7 +438,7 @@ async function startReview() {
     app.decks = await loadDecks(app.gh, app.allFiles);
   } catch (err) {
     if (!app.decks) {
-      toast(err.status === 0 ? 'Offline e carte non ancora scaricate' : err.message, { error: true });
+      toast(err.status === 0 ? 'Offline, and the cards have not been downloaded yet' : err.message, { error: true });
       location.hash = '';
       return;
     }
@@ -469,7 +481,7 @@ function bindUpload() {
     input.value = '';
     if (!app.uploadQueue.length) return;
     $('#upload-files').textContent = app.uploadQueue.map((f) => `${f.name} (${formatSize(f.size)})`).join(', ');
-    const folders = new Set(['matematica/libri', ...(app.files || []).map((f) => dirName(f.path)).filter(Boolean)]);
+    const folders = new Set(['math/books', ...(app.files || []).map((f) => dirName(f.path)).filter(Boolean)]);
     $('#upload-folders').replaceChildren(...[...folders].map((d) => el('option', { value: d })));
     dialog.showModal();
   });
@@ -477,28 +489,28 @@ function bindUpload() {
     if (dialog.returnValue !== 'ok') return;
     const folder = $('#upload-form').folder.value.trim().replace(/^\/+|\/+$/g, '');
     if (folder.split('/').some((s) => s === '.' || s === '..' || (folder && !s))) {
-      toast(`Cartella non valida: ${folder}`, { error: true, ms: 6000 });
+      toast(`Invalid folder: ${folder}`, { error: true, ms: 6000 });
       app.uploadQueue = [];
       return;
     }
     for (const file of app.uploadQueue) {
       if (file.size > MAX_UPLOAD_BYTES) {
-        toast(`${file.name}: troppo grande (massimo 95 MB)`, { error: true, ms: 6000 });
+        toast(`${file.name}: too large (95 MB max)`, { error: true, ms: 6000 });
         continue;
       }
       const head = new Uint8Array(await file.slice(0, 5).arrayBuffer());
       if (String.fromCharCode(...head) !== '%PDF-') {
-        toast(`${file.name}: non è un PDF valido`, { error: true, ms: 6000 });
+        toast(`${file.name}: not a valid PDF`, { error: true, ms: 6000 });
         continue;
       }
       const name = safeName(file.name).replace(/(\.pdf)?$/i, '.pdf');
       const path = folder ? `${folder}/${name}` : name;
       const existing = app.files?.find((f) => f.path === path);
-      if (existing && !confirm(`${path} esiste già. Sostituirlo?`)) continue;
-      toast(`Carico ${name}…`, { ms: 5000 });
+      if (existing && !confirm(`${path} already exists. Replace it?`)) continue;
+      toast(`Uploading ${name}…`, { ms: 5000 });
       try {
-        await app.gh.putLargeFile(path, await readAsBase64(file), `reader: aggiunto ${name}`);
-        toast(`${name} caricato`);
+        await app.gh.putLargeFile(path, await readAsBase64(file), `reader: add ${name}`);
+        toast(`${name} uploaded`);
       } catch (err) {
         toast(`${name}: ${err.message}`, { error: true, ms: 8000 });
       }
@@ -513,10 +525,10 @@ function bindUpload() {
 function renderSyncStatus() {
   const order = ['syncing', 'error', 'offline', 'pending', 'synced'];
   const statuses = [app.sync, app.cards, app.state].filter(Boolean).map((m) => m.status());
-  const status = statuses.sort((a, b) => order.indexOf(a.state) - order.indexOf(b.state))[0] || { state: 'synced', message: 'Sincronizzato' };
+  const status = statuses.sort((a, b) => order.indexOf(a.state) - order.indexOf(b.state))[0] || { state: 'synced', message: 'Synced' };
   for (const pill of document.querySelectorAll('[data-sync-pill]')) {
     pill.dataset.state = status.state;
-    pill.title = `${status.message} · tocca per sincronizzare`;
+    pill.title = `${status.message} · tap to sync`;
     pill.querySelector('.sync-text').textContent = status.message;
   }
 }
@@ -529,7 +541,7 @@ async function syncNow() {
   if (app.reader?.book) tasks.push(app.sync.sync(app.reader.book));
   const results = await Promise.allSettled(tasks);
   const failed = results.find((r) => r.status === 'rejected');
-  if (failed) toast(failed.reason?.status === 0 ? 'Offline: le modifiche restano salvate qui' : `Sincronizzazione non riuscita: ${failed.reason?.message}`, { error: true });
+  if (failed) toast(failed.reason?.status === 0 ? 'Offline: changes stay saved here' : `Sync failed: ${failed.reason?.message}`, { error: true });
   if (document.body.dataset.view === 'library') drawLibrary();
 }
 
@@ -607,7 +619,7 @@ async function checkForUpdate() {
       location.reload();
       return;
     }
-    toast('È disponibile una nuova versione dell\'app.', { ms: 600000, action: { label: 'Aggiorna', fn: () => location.reload() } });
+    toast('A new version of the app is available.', { ms: 600000, action: { label: 'Update', fn: () => location.reload() } });
   } catch {
     /* offline: try again later */
   }
@@ -617,13 +629,14 @@ async function checkForUpdate() {
 
 // Never run inside a frame: blocks clickjacking and pages that embed the app to drive it.
 if (window.top !== window.self) {
-  document.body.replaceChildren(document.createTextNode('Learn Reader non può essere aperto dentro un\'altra pagina.'));
+  document.body.replaceChildren(document.createTextNode('Learn Reader cannot be opened inside another page.'));
   throw new Error('Refusing to run in a frame');
 }
 
 bindSetup();
 bindUpload();
 bindGlobal();
+migrateLegacyStorage();
 const saved = loadConfig();
 if (saved) {
   connect(saved);

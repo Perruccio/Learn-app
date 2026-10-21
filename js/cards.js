@@ -1,17 +1,18 @@
 // Flashcards: card files, unlocking by session progress, review state and rendering.
 //
-// Card files live in any "flashcard/" folder of the repository as Anki-compatible
+// Card files live in any "flashcards/" folder of the repository as Anki-compatible
 // TSV (front \t back \t tags, with optional "#deck:..." header lines). Cards of a
 // session file (e.g. S003.tsv) unlock when that session is ticked in the
-// PROGRESSI.md next to the folder; other files (EVID-..., ERR-...) are always on.
-// Review state is stored in "<folder>/progresso.json" and synced like annotations.
+// PROGRESS.md next to the folder; other files (ERR-..., HL-..., legacy EVID-...)
+// are always on. Review state is stored in "<folder>/progress.json" and synced
+// like annotations.
 
 import { fsrs, generatorParameters, createEmptyCard, Rating, State } from '../vendor/ts-fsrs/ts-fsrs.mjs';
-import { dirName, storage } from './util.js?v=2b06f7adf1a7';
+import { dirName, storage } from './util.js?v=424474b999d1';
 
 export { Rating, State };
 
-export const CARD_FILE_RE = /(^|\/)flashcard\/[^/]+\.tsv$/i;
+export const CARD_FILE_RE = /(^|\/)flashcards\/[^/]+\.tsv$/i;
 const SESSION_STEM_RE = /^[A-Z]\d{2,4}$/;
 export const NEW_PER_DAY = 20;
 const LEARN_AHEAD_MS = 20 * 60 * 1000;
@@ -69,7 +70,7 @@ export function parseCardFile(text, path) {
   return cards;
 }
 
-/** Rows of a PROGRESSI.md table: [{done, id, title, link, track}]. */
+/** Rows of a PROGRESS.md table: [{done, id, title, link, track}]. */
 export function parseProgress(text) {
   const rows = [];
   const re = /^\|\s*\[( |x|X)\]\s*\|\s*(?:\[([A-Za-z]+\d+)\]\(([^)\s]+)\)|([A-Za-z]+\d+))\s*\|\s*([^|]*)\|\s*([^|]*)\|/;
@@ -83,7 +84,7 @@ export function parseProgress(text) {
   return rows;
 }
 
-/** Return PROGRESSI.md text with one session marked done or not done (or null if not found). */
+/** Return PROGRESS.md text with one session marked done or not done (or null if not found). */
 export function setSessionDone(text, id, done) {
   const lines = text.split('\n');
   const re = new RegExp(`^\\|\\s*\\[( |x|X)\\]\\s*\\|\\s*(\\[${id}\\]\\([^)]*\\)|${id})\\s*\\|`);
@@ -93,7 +94,7 @@ export function setSessionDone(text, id, done) {
   return lines.join('\n');
 }
 
-/** Return PROGRESSI.md text with one session ticked (or null if not found). */
+/** Return PROGRESS.md text with one session ticked (or null if not found). */
 export function tickSession(text, id) {
   const lines = text.split('\n');
   const re = new RegExp(`^\\|\\s*\\[ \\]\\s*\\|\\s*(\\[${id}\\]\\([^)]*\\)|${id})\\s*\\|`);
@@ -106,7 +107,7 @@ export function tickSession(text, id) {
 // ------------------------------------------------------------------ review state (synced document)
 
 export function progressPath(dir) {
-  return `${dir}/progresso.json`;
+  return `${dir}/progress.json`;
 }
 
 function emptyProgress(dir) {
@@ -194,7 +195,7 @@ export const progressCodec = {
   serialize: serializeProgress,
   isEmpty: (doc) => Object.keys(doc.cards).length === 0,
   toStorage: (doc) => ({ ...doc, cards: Object.values(doc.cards) }),
-  message: () => 'reader: ripasso flashcard',
+  message: () => 'reader: flashcard review',
 };
 
 // ------------------------------------------------------------------ scheduling helpers
@@ -282,9 +283,9 @@ export function humanInterval(ms) {
   const h = min / 60;
   if (h < 24) return `${Math.round(h)} h`;
   const d = h / 24;
-  if (d < 30) return `${Math.round(d)} g`;
-  if (d < 365) return `${Math.round(d / 30)} mesi`.replace(/^1 mesi$/, '1 mese');
-  return `${(d / 365).toFixed(1).replace('.0', '')} anni`.replace(/^1 anni$/, '1 anno');
+  if (d < 30) return `${Math.round(d)} d`;
+  if (d < 365) return `${Math.round(d / 30)} mo`;
+  return `${(d / 365).toFixed(1).replace('.0', '')} y`;
 }
 
 // ------------------------------------------------------------------ safe rich-text rendering
@@ -378,7 +379,7 @@ export async function loadDecks(gh, allFiles) {
   const out = { cards: [], locked: 0, dirs: [] };
   for (const dir of dirs) {
     const parent = dirName(dir);
-    const progressFile = allFiles.find((f) => f.path === (parent ? `${parent}/PROGRESSI.md` : 'PROGRESSI.md')) || null;
+    const progressFile = allFiles.find((f) => f.path === (parent ? `${parent}/PROGRESS.md` : 'PROGRESS.md')) || null;
     const rows = progressFile ? parseProgress(await readCached(progressFile)) : [];
     const done = new Set(rows.filter((r) => r.done).map((r) => r.id));
     out.dirs.push({ dir, progressFile, rows });

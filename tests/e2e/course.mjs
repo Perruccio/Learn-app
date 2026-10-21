@@ -6,17 +6,17 @@ import { APP, ORIGIN, CONTENT_DIR, FIXTURES, SHOTS, devices, launch } from '../l
 
 const LEARN = CONTENT_DIR;
 // Expectations derived from the content, so the suite runs on fixtures and on the real course.
-const PROG = fs.readFileSync(path.join(LEARN, 'matematica/PROGRESSI.md'), 'utf8');
+const PROG = fs.readFileSync(path.join(LEARN, 'math/PROGRESS.md'), 'utf8');
 const ROWS = [...PROG.matchAll(/^\| \[[ x]\] \| (\[)?([A-Z]\d{2,4})/gm)].map((m) => ({ id: m[2], linked: !!m[1] }));
 const FIRST_UNLINKED = ROWS.find((r) => !r.linked)?.id;
-const N_DOCS = ['metodo.md', 'setup.md', 'risorse.md'].filter((f) => fs.existsSync(path.join(LEARN, 'matematica/metodo', f))).length
-  + fs.readdirSync(path.join(LEARN, 'matematica/roadmap')).filter((f) => f.endsWith('.md')).length;
+const N_DOCS = ['method.md', 'setup.md', 'resources.md'].filter((f) => fs.existsSync(path.join(LEARN, 'math/method', f))).length
+  + fs.readdirSync(path.join(LEARN, 'math/roadmap')).filter((f) => f.endsWith('.md')).length;
 const gitSha = (b) => crypto.createHash('sha1').update(Buffer.concat([Buffer.from(`blob ${b.length}\0`), b])).digest('hex');
 const repo = new Map();
 const put = (p, b) => repo.set(p, { buf: Buffer.from(b), sha: gitSha(Buffer.from(b)) });
 const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((d) => (d.isDirectory() ? (d.name === '.git' ? [] : walk(path.join(dir, d.name))) : [path.join(dir, d.name)]));
 for (const f of walk(LEARN)) if (/\.(md|tsv|ipynb)$/.test(f)) put(path.relative(LEARN, f), fs.readFileSync(f));
-put('matematica/evil.md', '# Evil\n\n<script>window.__pwned=1</script>\n\n<img src=x onerror="window.__pwned=1">\n\n[click](javascript:window.__pwned=1) [data](data:text/html,hi) $\\href{javascript:alert(1)}{x}$\n\n| a | b |\n|---|---|\n| <b onclick="window.__pwned=1">x</b> | y |\n');
+put('math/evil.md', '# Evil\n\n<script>window.__pwned=1</script>\n\n<img src=x onerror="window.__pwned=1">\n\n[click](javascript:window.__pwned=1) [data](data:text/html,hi) $\\href{javascript:alert(1)}{x}$\n\n| a | b |\n|---|---|\n| <b onclick="window.__pwned=1">x</b> | y |\n');
 const puts = [];
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Authorization, Content-Type, Accept', 'Access-Control-Allow-Methods': 'GET, PUT, OPTIONS' };
 async function handle(route) {
@@ -60,65 +60,69 @@ const synced = (page) => page.waitForFunction(() => [...document.querySelectorAl
 
 const A = await device({ viewport: { width: 1200, height: 900 } });
 await A.page.waitForSelector('#next-session:not([hidden])');
-check('home links the next session inside the app', (await A.page.getAttribute('#next-open', 'href')) === '#doc=matematica/sessioni/S001.md');
+const nextHref = await A.page.getAttribute('#next-open', 'href');
+check('home links the next session inside the app', nextHref === '#doc=math/sessions/S001.md', nextHref);
 await A.page.click('#next-open');
 await A.page.waitForSelector('#view-course:not([hidden]) .md h1');
 check('session page title', /S001/.test(await A.page.textContent('#course-title')), await A.page.textContent('#course-title'));
 const katexInfo = await A.page.evaluate(() => ({ ok: document.querySelectorAll('.md .katex').length, bad: document.querySelectorAll('.md .katex-error').length }));
 check('formulas rendered with KaTeX', katexInfo.ok > 3 && katexInfo.bad === 0, JSON.stringify(katexInfo));
 const steps = await A.page.$$eval('.stepper .step', (n) => n.map((x) => x.textContent.trim()));
-check('stepper with the 4 phases of the session', steps.length === 4 && /Ripasso/.test(steps[0]) && /Esercizi/.test(steps[3]), steps.join(' | '));
+check('stepper with the 4 phases of the session', steps.length === 4 && /Review/.test(steps[0]) && /Pretest/.test(steps[1]) && /Theory/.test(steps[2]) && /Exercises/.test(steps[3]), steps.join(' | '));
 const links = await A.page.evaluate(() => [...document.querySelectorAll('.md a')].map((a) => [a.textContent.trim(), a.getAttribute('href'), a.target]));
 const reader = links.find(([t]) => /reader/i.test(t));
 const colab = links.find(([t]) => /Colab/.test(t));
-const solLink = links.find(([, h]) => h && h.includes('soluzioni'));
-check('reader link stays in the app', reader && /^#read=matematica\/libri\/[^/]+\.pdf$/.test(reader[1]), String(reader));
+const solLink = links.find(([, h]) => h && h.includes('solutions'));
+check('reader link stays in the app', reader && /^#read=math\/books\/[^/]+\.pdf$/.test(reader[1]), String(reader));
 check('notebook link opens Colab in a new tab', colab && colab[1].startsWith('https://colab.research.google.com/') && colab[2] === '_blank', String(colab));
-check('links to other files stay in the app', solLink && solLink[1].startsWith('#doc=matematica/soluzioni/'), String(solLink));
+check('links to other files stay in the app', solLink && solLink[1].startsWith('#doc=math/solutions/'), String(solLink));
 await A.page.screenshot({ path: `${SHOTS}/c1-session.png` });
 
 // One tap = "I got here": tapping phase 3 marks 1–3 done
 await A.page.click('.stepper .step:nth-child(3) button');
 await A.page.waitForFunction(() => document.querySelectorAll('.stepper .step.s-done').length === 3);
-check('tap on phase 3 marks phases 1–3 as done', /Esercizi/.test(await A.page.textContent('.step-hint')), await A.page.textContent('.step-hint'));
+check('tap on phase 3 marks phases 1–3 as done', /Exercises/.test(await A.page.textContent('.step-hint')), await A.page.textContent('.step-hint'));
 await A.page.click('.stepper .step:nth-child(3) button');
 await A.page.waitForFunction(() => document.querySelectorAll('.stepper .step.s-done').length === 2);
 check('tapping the last done phase again steps back', true);
 await A.page.click('.stepper .step:nth-child(3) button');
 await A.page.waitForFunction(() => document.querySelectorAll('.stepper .step.s-done').length === 3);
 // Optional personal to-do
-await A.page.fill('.session-end .add-input', 'Rifare T3 domani');
+await A.page.fill('.session-end .add-input', 'Redo T3 tomorrow');
 await A.page.press('.session-end .add-input', 'Enter');
 await A.page.waitForSelector('.session-end .check-list li');
-check('personal to-do added', (await A.page.textContent('.session-end .check-list')).includes('Rifare T3'));
+check('personal to-do added', (await A.page.textContent('.session-end .check-list')).includes('Redo T3'));
 // Error log
-await A.page.fill('textarea[data-field="what"]', 'Ho confuso unione e somma di sottospazi');
-await A.page.fill('textarea[data-field="fix"]', 'U+W è il più piccolo sottospazio che contiene U∪W');
+await A.page.fill('textarea[data-field="what"]', 'Mixed up union and sum of subspaces');
+await A.page.fill('textarea[data-field="fix"]', 'U+W is the smallest subspace containing U∪W');
 await A.page.click('.error-form .btn');
 await A.page.waitForSelector('.error-list li');
-check('error added to the log', (await A.page.textContent('.error-list')).includes('confuso'));
+check('error added to the log', (await A.page.textContent('.error-list')).includes('Mixed up'));
 await synced(A.page);
-const state = JSON.parse(repo.get('matematica/stato.json').buf.toString());
-check('state synced to stato.json', state.sessions.S001.stage.value === 3 && Object.values(state.errors).length === 1, JSON.stringify(state).slice(0, 120));
+const state = JSON.parse(repo.get('math/state.json').buf.toString());
+check('state synced to state.json', state.sessions.S001.stage.value === 3 && Object.values(state.errors).length === 1, JSON.stringify(state).slice(0, 120));
 
 await synced(A.page);
 // Solutions
-await A.page.click('.session-end .btn >> text=Mostra le soluzioni');
+await A.page.click('.session-end .btn >> text=Show solutions');
 await A.page.waitForSelector('.solutions:not([hidden]) pre code');
 check('solutions rendered in the app with code blocks', (await A.page.$$('.solutions pre')).length >= 1);
 
 // Completion
 await A.page.click('.session-end .btn-primary');
-await A.page.waitForSelector('.session-end .btn >> text=Completata');
-check('PROGRESSI.md ticked from the session page', /\| \[x\] \| \[S001\]/.test(repo.get('matematica/PROGRESSI.md').buf.toString()));
+await A.page.waitForSelector('.session-end .btn >> text=✓ Done');
+check('PROGRESS.md ticked from the session page', /\| \[x\] \| \[S001\]/.test(repo.get('math/PROGRESS.md').buf.toString()));
+check('app commit messages in English', puts.includes('math/PROGRESS.md :: reader: S001 done') && puts.some((p) => p.startsWith('math/state.json :: reader: session progress')), puts.join(' ; '));
 
 // Progress page
-await A.page.click('#view-course a[href="#percorso"]');
+await A.page.click('#view-course a[href="#path"]');
 await A.page.waitForSelector('.progress-summary');
 await sleep(500);
-check('progress shows 1 completed session', new RegExp(`1 di ${ROWS.length}\\b`).test(await A.page.textContent('.progress-summary')), (await A.page.textContent('.progress-summary')).slice(0, 60));
+check('progress shows 1 completed session', new RegExp(`1 of ${ROWS.length}\\b`).test(await A.page.textContent('.progress-summary')), (await A.page.textContent('.progress-summary')).slice(0, 60));
+const trackNames = await A.page.$$eval('.track-name', (n) => n.map((x) => x.textContent));
+check('progress grouped by word track codes', trackNames.includes('LinAlg') && trackNames.includes('Prob') && trackNames.every((t) => /^[A-Za-z]+$/.test(t)), trackNames.join(' '));
 const rows = await A.page.$$eval('.session-row', (n) => n.map((r) => [r.querySelector('.session-id').textContent, r.querySelector('.session-state').textContent, r.tagName]));
-check('statuses: S001 done, S002 todo, unprepared sessions not yet available', rows[0][1] === 'Completata' && rows[1][1] === 'Da fare' && (!FIRST_UNLINKED || rows.find((r) => r[0] === FIRST_UNLINKED)[2] === 'DIV'), JSON.stringify(rows.slice(0, 2)));
+check('statuses: S001 done, S002 todo, unprepared sessions not yet available', rows[0][1] === 'Done' && rows[1][1] === 'To do' && (!FIRST_UNLINKED || rows.find((r) => r[0] === FIRST_UNLINKED)[2] === 'DIV'), JSON.stringify(rows.slice(0, 2)));
 // Skip a topic: choose "recover later", then undo, then "drop for good"
 await A.page.click('.session-row >> text=S002');
 await A.page.waitForSelector('.skip-open');
@@ -126,21 +130,21 @@ await A.page.click('.skip-open');
 await A.page.screenshot({ path: `${SHOTS}/c5-skip-ask.png` });
 await A.page.click('.skip-box [data-skip="later"]');
 await A.page.waitForSelector('.skip-box.is-skipped');
-check('skipped topic shown on the session page', /recuperare/.test(await A.page.textContent('.skip-box')));
+check('skipped topic shown on the session page', /recover later/.test(await A.page.textContent('.skip-box')));
 await synced(A.page);
-const skipState = JSON.parse(repo.get('matematica/stato.json').buf.toString()).sessions.S002?.skip;
-check('skip synced to stato.json', skipState?.value === 'later' && skipState.updatedAt > 0, JSON.stringify(skipState));
+const skipState = JSON.parse(repo.get('math/state.json').buf.toString()).sessions.S002?.skip;
+check('skip synced to state.json', skipState?.value === 'later' && skipState.updatedAt > 0, JSON.stringify(skipState));
 await A.page.click('.skip-box .btn-ghost');
 await A.page.waitForSelector('.skip-open');
 check('skip can be undone', true);
 await A.page.click('.skip-open');
 await A.page.click('.skip-box [data-skip="drop"]');
 await A.page.waitForSelector('.skip-box.is-skipped');
-await A.page.click('#view-course a[href="#percorso"]');
+await A.page.click('#view-course a[href="#path"]');
 await A.page.waitForSelector('.progress-summary');
 await sleep(300);
 const dropped = await A.page.$$eval('.session-row', (n) => n.map((r) => r.querySelector('.session-state').textContent));
-check('dropped topic marked in the path and not counted', dropped[1] === 'Tolta dal percorso' && new RegExp(`1 di ${ROWS.length - 1}\\b`).test(await A.page.textContent('.progress-summary')), dropped[1]);
+check('dropped topic marked in the path and not counted', dropped[1] === 'Dropped from the path' && new RegExp(`1 of ${ROWS.length - 1}\\b`).test(await A.page.textContent('.progress-summary')), dropped[1]);
 await A.page.evaluate(() => (location.hash = '#'));
 await A.page.waitForSelector('#next-session:not([hidden])');
 await A.page.waitForFunction(() => !/S002/.test(document.querySelector('#next-title').textContent));
@@ -152,17 +156,21 @@ const revived = await A.page.evaluate(async () => {
   return [doc.sessions.S001.skip, doc.sessions.S002.skip, doc.sessions.S003.skip];
 });
 check('tampered skip values rejected', revived[0] === null && revived[1] === null && JSON.stringify(revived[2]) === '{"value":"later","updatedAt":5}', JSON.stringify(revived));
+// Old Italian routes still work: they redirect to the new ones
+await A.page.evaluate(() => (location.hash = '#'));
+await A.page.waitForSelector('#view-library:not([hidden])');
 await A.page.evaluate(() => (location.hash = '#percorso'));
-await A.page.waitForSelector('.progress-summary');
+await A.page.waitForSelector('#view-course:not([hidden]) .progress-summary');
+check('#percorso redirects to #path', (await A.page.evaluate(() => location.hash)) === '#path' && (await A.page.textContent('#course-title')) === 'Path', await A.page.evaluate(() => location.hash));
 check('documents listed (method pages and roadmaps)', (await A.page.$$('.doc-links a')).length === N_DOCS, String((await A.page.$$('.doc-links a')).length));
 await A.page.screenshot({ path: `${SHOTS}/c2-progress.png`, fullPage: false });
 // A roadmap document renders with its table
-await A.page.click('.doc-links a >> text=/^Roadmap · LA/');
+await A.page.click('.doc-links a >> text=/^Roadmap · LinAlg/');
 await A.page.waitForSelector('.md table');
 check('roadmap document with table rendered', (await A.page.$$('.md table tr')).length > 3);
 
 // Hostile markdown
-await A.page.evaluate(() => (location.hash = '#doc=matematica/evil.md'));
+await A.page.evaluate(() => (location.hash = '#doc=math/evil.md'));
 await A.page.waitForSelector('.md h1 >> text=Evil');
 await sleep(500);
 const evil = await A.page.evaluate(() => ({
@@ -191,17 +199,17 @@ const all = await A.page.evaluate(async (paths) => {
     if (stray) bad.push(`${p}: stray ${stray[0]}`);
   }
   return { math, bad };
-}, [...repo].filter(([k]) => k.endsWith('.md') && k.includes('/') && k !== 'matematica/evil.md').map(([k, v]) => [k, v.buf.toString()]));
+}, [...repo].filter(([k]) => k.endsWith('.md') && k.includes('/') && k !== 'math/evil.md').map(([k, v]) => [k, v.buf.toString()]));
 check('every repository document renders its math', all.bad.length === 0 && all.math > 10, `${all.math} formulas; ${all.bad.slice(0, 4).join(' ; ')}`);
 
 // Device B sees the same checklist
 const B = await device({ ...devices['iPhone 13'] });
-await B.page.evaluate(() => (location.hash = '#doc=matematica/sessioni/S001.md'));
+await B.page.evaluate(() => (location.hash = '#doc=math/sessions/S001.md'));
 await B.page.waitForSelector('.stepper .step');
 await sleep(1500);
-check('device B sees the phase reached, the to-do and the errors', (await B.page.$$('.stepper .step.s-done')).length === 4 && /completata/i.test(await B.page.textContent('.step-hint')) && (await B.page.$$('.error-list li')).length === 1 && (await B.page.$$('.session-end .check-list li')).length === 1);
+check('device B sees the phase reached, the to-do and the errors', (await B.page.$$('.stepper .step.s-done')).length === 4 && /session done/i.test(await B.page.textContent('.step-hint')) && (await B.page.$$('.error-list li')).length === 1 && (await B.page.$$('.session-end .check-list li')).length === 1);
 await B.page.screenshot({ path: `${SHOTS}/c3-phone-session.png` });
-await B.page.evaluate(() => (location.hash = '#percorso'));
+await B.page.evaluate(() => (location.hash = '#path'));
 await B.page.waitForSelector('.progress-summary');
 await sleep(400);
 await B.page.screenshot({ path: `${SHOTS}/c4-phone-progress.png` });

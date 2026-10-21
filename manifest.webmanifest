@@ -1,7 +1,7 @@
 {
   "name": "Learn Reader",
   "short_name": "Reader",
-  "description": "Lettore PDF con evidenziazioni e note sincronizzate su GitHub.",
+  "description": "PDF reader with highlights and notes synced to GitHub.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

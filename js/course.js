@@ -1,13 +1,13 @@
 // Study path inside the app: progress overview, session pages with checklists,
 // solutions on demand, error log. Nothing here requires opening GitHub.
 //
-// Progress of sessions is PROGRESSI.md (ticked rows). The reached step of each
-// session, personal to-dos and the error log are stored in "<base>/stato.json"
+// Progress of sessions is PROGRESS.md (ticked rows). The reached step of each
+// session, personal to-dos and the error log are stored in "<base>/state.json"
 // (synced like annotations).
 
-import { el, dirName, toast, uid } from './util.js?v=2b06f7adf1a7';
-import { loadMath, parseProgress, readText, setSessionDone } from './cards.js?v=2b06f7adf1a7';
-import { joinPath, renderMarkdown } from './markdown.js?v=2b06f7adf1a7';
+import { el, dirName, toast, uid } from './util.js?v=424474b999d1';
+import { loadMath, parseProgress, readText, setSessionDone } from './cards.js?v=424474b999d1';
+import { joinPath, renderMarkdown } from './markdown.js?v=424474b999d1';
 
 const SESSION_ID = /^[A-Z]\d{2,4}$/;
 const ID_RE = /^[a-z0-9]{4,24}$/;
@@ -87,14 +87,14 @@ function sortKeys(value) {
 export const stateCodec = {
   namespace: 'state',
   autoDelay: 6000,
-  path: (base) => (base ? `${base}/stato.json` : 'stato.json'),
+  path: (base) => (base ? `${base}/state.json` : 'state.json'),
   empty: emptyState,
   revive: reviveState,
   merge: mergeState,
   serialize: (doc) => `${JSON.stringify(sortKeys({ version: 1, sessions: doc.sessions, errors: doc.errors }), null, 2)}\n`,
   isEmpty: (doc) => !Object.keys(doc.sessions).length && !Object.keys(doc.errors).length,
   toStorage: (doc) => doc,
-  message: () => 'reader: avanzamento sessioni',
+  message: () => 'reader: session progress',
 };
 
 // ------------------------------------------------------------------ helpers
@@ -130,7 +130,7 @@ function checkbox(checked, label, onToggle) {
       role: 'checkbox',
       'aria-checked': String(checked),
       'aria-label': label,
-      title: checked ? 'Fatto' : 'Da fare',
+      title: checked ? 'Done' : 'To do',
       onclick: (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -166,7 +166,7 @@ export class Course {
   /** All progress tables: [{base, path, rows}]. */
   async tables() {
     const out = [];
-    for (const f of this.allFiles.filter((x) => /(^|\/)PROGRESSI\.md$/.test(x.path))) {
+    for (const f of this.allFiles.filter((x) => /(^|\/)PROGRESS\.md$/.test(x.path))) {
       out.push({ base: dirName(f.path), path: f.path, rows: parseProgress(await readText(this.gh, f)) });
     }
     return out;
@@ -199,10 +199,10 @@ export class Course {
   // ------------------------------------------------------------------ progress view
 
   async renderProgress(container) {
-    container.replaceChildren(el('p', { class: 'muted' }, 'Carico il percorso…'));
+    container.replaceChildren(el('p', { class: 'muted' }, 'Loading the path…'));
     const tables = await this.tables();
     if (!tables.length) {
-      container.replaceChildren(el('p', { class: 'muted' }, 'Nessun PROGRESSI.md nel repository.'));
+      container.replaceChildren(el('p', { class: 'muted' }, 'No PROGRESS.md in the repository.'));
       return;
     }
     const nodes = [];
@@ -213,7 +213,8 @@ export class Course {
       const done = rows.filter((r) => r.done).length;
       const tracks = {};
       for (const r of rows) {
-        const k = (r.track.match(/^[A-Z]{2}/) || ['Misto'])[0];
+        // Track code = the word before the dash ("LinAlg-01" -> "LinAlg"); anything else is mixed.
+        const k = (r.track.match(/^[A-Za-z]+(?=-)/) || ['Mixed'])[0];
         tracks[k] ??= { done: 0, total: 0 };
         tracks[k].total++;
         if (r.done) tracks[k].done++;
@@ -223,9 +224,9 @@ export class Course {
         el(
           'section',
           { class: 'panel-card progress-summary' },
-          el('div', { class: 'panel-card-head' }, el('span', { class: 'eyebrow' }, t.base || 'Percorso')),
-          el('p', { class: 'review-counts' }, el('span', { class: 'big' }, String(done)), ` di ${rows.length} sessioni completate`),
-          progressBar(rows.length ? done / rows.length : 0, 'Avanzamento totale'),
+          el('div', { class: 'panel-card-head' }, el('span', { class: 'eyebrow' }, t.base || 'Path')),
+          el('p', { class: 'review-counts' }, el('span', { class: 'big' }, String(done)), ` of ${rows.length} sessions done`),
+          progressBar(rows.length ? done / rows.length : 0, 'Overall progress'),
           el(
             'div',
             { class: 'track-bars' },
@@ -233,7 +234,7 @@ export class Course {
               el('div', { class: 'track-row' }, el('span', { class: 'track-name' }, k), progressBar(v.done / v.total, k), el('span', { class: 'track-num' }, `${v.done}/${v.total}`)),
             ),
           ),
-          errorsOpen ? el('p', { class: 'muted small' }, `${errorsOpen} errori annotati da trasformare in flashcard: chiedi a Claude «fammi le flashcard dagli errori».`) : null,
+          errorsOpen ? el('p', { class: 'muted small' }, `${errorsOpen} logged ${errorsOpen === 1 ? 'error' : 'errors'} to turn into flashcards: ask Claude “make flashcards from my errors”.`) : null,
         ),
       );
       const blocks = [...new Set(t.rows.map((r) => r.block))];
@@ -242,7 +243,7 @@ export class Course {
           el(
             'section',
             { class: 'block' },
-            el('h2', { class: 'lib-group-title' }, b || 'Sessioni'),
+            el('h2', { class: 'lib-group-title' }, b || 'Sessions'),
             el(
               'ul',
               { class: 'session-list' },
@@ -256,11 +257,11 @@ export class Course {
                   const skip = r.done ? null : skipOf(state, r.id);
                   const status = r.done ? 'done' : skip === 'drop' ? 'dropped' : skip === 'later' ? 'skipped' : started ? 'started' : 'todo';
                   const label = {
-                    done: 'Completata',
-                    skipped: 'Saltata · da recuperare',
-                    dropped: 'Tolta dal percorso',
-                    started: st?.stage?.label ? `In corso · fatto fino a ${st.stage.label}` : 'In corso',
-                    todo: available ? 'Da fare' : 'In preparazione',
+                    done: 'Done',
+                    skipped: 'Skipped · to recover',
+                    dropped: 'Dropped from the path',
+                    started: st?.stage?.label ? `In progress · done up to ${st.stage.label}` : 'In progress',
+                    todo: available ? 'To do' : 'Being prepared',
                   }[status];
                   const inner = [
                     el('span', { class: `status-dot s-${status}`, title: label, 'aria-label': label }),
@@ -276,9 +277,9 @@ export class Course {
       }
       // Documents: method pages plus every roadmap (titled by its first heading).
       const docs = [
-        ['Metodo di studio', 'metodo/metodo.md'],
-        ['Setup e strumenti', 'metodo/setup.md'],
-        ['Risorse', 'metodo/risorse.md'],
+        ['Study method', 'method/method.md'],
+        ['Setup and tools', 'method/setup.md'],
+        ['Resources', 'method/resources.md'],
       ].filter(([, p]) => this.file(joinPath(t.base, p)));
       const roadmapDir = joinPath(t.base, 'roadmap');
       const roadmaps = this.allFiles.filter((f) => dirName(f.path) === roadmapDir && /\.md$/i.test(f.path)).sort((a, b) => a.path.localeCompare(b.path));
@@ -291,7 +292,7 @@ export class Course {
           el(
             'section',
             { class: 'block' },
-            el('h2', { class: 'lib-group-title' }, 'Documenti'),
+            el('h2', { class: 'lib-group-title' }, 'Documents'),
             el('ul', { class: 'doc-links' }, docs.map(([label, p]) => el('li', {}, el('a', { href: `#doc=${joinPath(t.base, p)}` }, label)))),
           ),
         );
@@ -305,23 +306,23 @@ export class Course {
   async renderDoc(container, path, { title }) {
     const file = this.file(path);
     if (!file) {
-      container.replaceChildren(el('p', { class: 'form-error' }, `File non trovato: ${path}`));
+      container.replaceChildren(el('p', { class: 'form-error' }, `File not found: ${path}`));
       return;
     }
-    container.replaceChildren(el('p', { class: 'muted' }, 'Carico…'));
+    container.replaceChildren(el('p', { class: 'muted' }, 'Loading…'));
     const [text] = await Promise.all([readText(this.gh, file), loadMath()]);
-    const m = path.match(/(?:^|\/)sessioni\/([A-Z]\d{2,4})\.md$/);
+    const m = path.match(/(?:^|\/)sessions\/([A-Z]\d{2,4})\.md$/);
     const sid = m ? m[1] : null;
     const base = sid ? dirName(dirName(path)) : null;
 
-    // Steps of a session = its numbered sections: "## 1 · Ripasso (10')", ...
+    // Steps of a session = its numbered sections: "## 1 · Review (10')", ...
     const steps = [];
     const anchor = sid
       ? (block) => {
           if (block.type !== 'heading' || block.level !== 2) return;
           const h = block.text.match(/^(\d+)\s*·\s*(.+?)\s*(?:\((\d+)'\))?$/);
           if (!h) return;
-          steps.push({ label: plain(h[2]).replace(/\s+prima di leggere$/i, ''), minutes: h[3] ? Number(h[3]) : null, node: block.node });
+          steps.push({ label: plain(h[2]), minutes: h[3] ? Number(h[3]) : null, node: block.node });
         }
       : null;
 
@@ -338,13 +339,13 @@ export class Course {
 
     // Session page: stepper ("where am I"), content, end-of-session panel.
     this.view = { path, sid, base, steps, body };
-    const progressFile = this.file(base ? `${base}/PROGRESSI.md` : 'PROGRESSI.md');
+    const progressFile = this.file(base ? `${base}/PROGRESS.md` : 'PROGRESS.md');
     this.view.row = progressFile ? parseProgress(await readText(this.gh, progressFile)).find((r) => r.id === sid) : null;
     this.view.progressPath = progressFile?.path;
 
-    const stepper = el('nav', { class: 'stepper', 'aria-label': 'Dove sei arrivato' });
-    const end = el('section', { class: 'panel-card session-end', id: 'fine-sessione' });
-    const solutionsPath = joinPath(dirName(dirName(path)), `soluzioni/${sid}.md`);
+    const stepper = el('nav', { class: 'stepper', 'aria-label': 'Where you are' });
+    const end = el('section', { class: 'panel-card session-end', id: 'session-end' });
+    const solutionsPath = joinPath(dirName(dirName(path)), `solutions/${sid}.md`);
     const solutions = el('section', { class: 'solutions', hidden: true });
     container.replaceChildren(stepper, body, end, solutions);
     Object.assign(this.view, { stepper, end, solutions, solutionsPath: this.file(solutionsPath) ? solutionsPath : null });
@@ -360,7 +361,7 @@ export class Course {
     const label = value > 0 ? v.steps[value - 1].label : '';
     this._custom((s) => (s.stage = { value, label, updatedAt: Date.now() }));
     if (value === v.steps.length && value > 0) {
-      toast('Ultima fase fatta: annota gli errori e segna la sessione come fatta.', { ms: 4500 });
+      toast('Last phase done: log your errors and mark the session as done.', { ms: 4500 });
       v.end.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } else if (value < v.steps.length) {
       v.steps[value]?.node.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -409,7 +410,7 @@ export class Course {
               {
                 type: 'button',
                 'aria-pressed': String(state === 'done'),
-                title: state === 'done' ? (n === stage ? 'Tocca di nuovo per tornare indietro' : 'Fatto') : 'Tocca quando hai finito questa fase',
+                title: state === 'done' ? (n === stage ? 'Tap again to step back' : 'Done') : 'Tap when you finish this phase',
                 onclick: () => !completed && this.setStage(n),
               },
               el('span', { class: 'step-dot' }, state === 'done' ? '✓' : String(n)),
@@ -422,12 +423,12 @@ export class Course {
         'p',
         { class: 'step-hint' },
         completed
-          ? 'Sessione completata.'
+          ? 'Session done.'
           : stage === 0
-            ? 'Tocca una fase quando l’hai finita: quelle prima si segnano da sole.'
+            ? 'Tap a phase when you finish it: the ones before it are marked too.'
             : stage < v.steps.length
-              ? `Prossima fase: ${v.steps[stage].label}.`
-              : 'Tutte le fasi fatte: chiudi la sessione in fondo alla pagina.',
+              ? `Next phase: ${v.steps[stage].label}.`
+              : 'All phases done: close the session at the bottom of the page.',
       ),
       completed ? null : this._skipControls(skip),
     );
@@ -437,7 +438,7 @@ export class Course {
     const customs = Object.entries(s.custom)
       .filter(([, c]) => !c.deleted)
       .sort((a, b) => a[1].createdAt - b[1].createdAt);
-    const input = el('input', { type: 'text', class: 'add-input', placeholder: 'Promemoria (es. «rifare T3 domani»)', maxlength: '300', 'aria-label': 'Nuovo promemoria' });
+    const input = el('input', { type: 'text', class: 'add-input', placeholder: 'Reminder (e.g. “redo T3 tomorrow”)', maxlength: '300', 'aria-label': 'New reminder' });
     input.value = typed.add;
     const add = () => {
       const text = input.value.trim();
@@ -452,8 +453,8 @@ export class Course {
     const errors = Object.entries(doc.errors)
       .filter(([, e]) => !e.deleted && e.session === v.sid)
       .sort((a, b) => a[1].createdAt - b[1].createdAt);
-    const what = el('textarea', { rows: '2', placeholder: 'Cosa ho sbagliato', maxlength: '2000', 'aria-label': 'Cosa ho sbagliato', dataset: { field: 'what' } });
-    const fix = el('textarea', { rows: '2', placeholder: 'Idea corretta (facoltativo)', maxlength: '2000', 'aria-label': 'Idea corretta', dataset: { field: 'fix' } });
+    const what = el('textarea', { rows: '2', placeholder: 'What I got wrong', maxlength: '2000', 'aria-label': 'What I got wrong', dataset: { field: 'what' } });
+    const fix = el('textarea', { rows: '2', placeholder: 'Correct idea (optional)', maxlength: '2000', 'aria-label': 'Correct idea', dataset: { field: 'fix' } });
     what.value = typed.what;
     fix.value = typed.fix;
     const addError = () => {
@@ -467,7 +468,7 @@ export class Course {
     };
 
     v.end.replaceChildren(
-      el('div', { class: 'panel-card-head' }, el('span', { class: 'eyebrow' }, 'Registro errori')),
+      el('div', { class: 'panel-card-head' }, el('span', { class: 'eyebrow' }, 'Error log')),
       errors.length
         ? el(
             'ul',
@@ -477,13 +478,13 @@ export class Course {
                 'li',
                 {},
                 el('span', { class: 'err-text' }, e.text, e.fix ? el('span', { class: 'err-fix' }, `→ ${e.fix}`) : null),
-                el('button', { type: 'button', class: 'icon-btn small-x', 'aria-label': 'Elimina errore', title: 'Elimina', onclick: () => this.state.mutate(v.base, (d) => (d.errors[id] = { deleted: true, updatedAt: Date.now() })) }, '×'),
+                el('button', { type: 'button', class: 'icon-btn small-x', 'aria-label': 'Delete error', title: 'Delete', onclick: () => this.state.mutate(v.base, (d) => (d.errors[id] = { deleted: true, updatedAt: Date.now() })) }, '×'),
               ),
             ),
           )
-        : el('p', { class: 'muted small' }, 'Nessun errore annotato per questa sessione. Diventeranno flashcard.'),
-      el('div', { class: 'error-form' }, what, fix, el('button', { type: 'button', class: 'btn btn-small', onclick: addError }, 'Annota errore')),
-      el('div', { class: 'panel-card-head todo-head' }, el('span', { class: 'eyebrow' }, 'Promemoria')),
+        : el('p', { class: 'muted small' }, 'No errors logged for this session. They will become flashcards.'),
+      el('div', { class: 'error-form' }, what, fix, el('button', { type: 'button', class: 'btn btn-small', onclick: addError }, 'Add error')),
+      el('div', { class: 'panel-card-head todo-head' }, el('span', { class: 'eyebrow' }, 'Reminders')),
       customs.length
         ? el(
             'ul',
@@ -494,25 +495,25 @@ export class Course {
                 { class: c.done ? 'is-checked' : '' },
                 checkbox(c.done, c.text, () => this._custom((sess) => (sess.custom[id] = { ...sess.custom[id], done: !c.done, updatedAt: Date.now() }))),
                 el('span', { class: 'check-label' }, c.text),
-                el('button', { type: 'button', class: 'icon-btn small-x', 'aria-label': 'Elimina promemoria', title: 'Elimina', onclick: () => this._custom((sess) => (sess.custom[id] = { deleted: true, updatedAt: Date.now() })) }, '×'),
+                el('button', { type: 'button', class: 'icon-btn small-x', 'aria-label': 'Delete reminder', title: 'Delete', onclick: () => this._custom((sess) => (sess.custom[id] = { deleted: true, updatedAt: Date.now() })) }, '×'),
               ),
             ),
           )
         : null,
-      el('div', { class: 'add-row' }, input, el('button', { type: 'button', class: 'btn btn-small', onclick: add }, 'Aggiungi')),
+      el('div', { class: 'add-row' }, input, el('button', { type: 'button', class: 'btn btn-small', onclick: add }, 'Add')),
       el(
         'div',
         { class: 'panel-actions end-actions' },
         v.solutionsPath
-          ? el('button', { type: 'button', class: 'btn', onclick: () => this.toggleSolutions() }, v.solutions.hidden ? 'Mostra le soluzioni' : 'Nascondi le soluzioni')
+          ? el('button', { type: 'button', class: 'btn', onclick: () => this.toggleSolutions() }, v.solutions.hidden ? 'Show solutions' : 'Hide solutions')
           : null,
         v.progressPath && v.row
           ? completed
-            ? el('button', { type: 'button', class: 'btn btn-ghost', onclick: () => this.setDone(false) }, '✓ Completata · annulla')
-            : el('button', { type: 'button', class: 'btn btn-primary', onclick: () => this.setDone(true) }, 'Segna la sessione come fatta')
+            ? el('button', { type: 'button', class: 'btn btn-ghost', onclick: () => this.setDone(false) }, '✓ Done · undo')
+            : el('button', { type: 'button', class: 'btn btn-primary', onclick: () => this.setDone(true) }, 'Mark session as done')
           : null,
       ),
-      v.solutionsPath && v.solutions.hidden ? el('p', { class: 'muted small' }, 'Le soluzioni vanno aperte solo dopo un tentativo vero.') : null,
+      v.solutionsPath && v.solutions.hidden ? el('p', { class: 'muted small' }, 'Open the solutions only after a real attempt.') : null,
     );
   }
 
@@ -527,25 +528,25 @@ export class Course {
           'p',
           { class: 'skip-msg' },
           skip === 'drop'
-            ? 'Argomento tolto dal percorso: niente esercizi, ripassi né flashcard su questo.'
-            : 'Argomento saltato, da recuperare più avanti: fino ad allora niente ripassi né flashcard su questo.',
+            ? 'Topic dropped from the path: no exercises, reviews or flashcards on it.'
+            : 'Topic skipped, to recover later: until then no reviews or flashcards on it.',
         ),
-        el('button', { type: 'button', class: 'btn btn-small btn-ghost', onclick: () => this.setSkip('') }, 'Annulla il salto'),
+        el('button', { type: 'button', class: 'btn btn-small btn-ghost', onclick: () => this.setSkip('') }, 'Undo skip'),
       );
     }
     if (!v.skipAsk) {
-      return el('div', { class: 'skip-box' }, el('button', { type: 'button', class: 'link-btn skip-open', onclick: () => ((v.skipAsk = true), this._refreshChecks()) }, 'Salta questo argomento'));
+      return el('div', { class: 'skip-box' }, el('button', { type: 'button', class: 'link-btn skip-open', onclick: () => ((v.skipAsk = true), this._refreshChecks()) }, 'Skip this topic'));
     }
     return el(
       'div',
       { class: 'skip-box is-asking' },
-      el('p', { class: 'skip-msg' }, 'Salti l’argomento con esercizi, ripassi e flashcard. Poi?'),
+      el('p', { class: 'skip-msg' }, 'This skips the topic with its exercises, reviews and flashcards. Then?'),
       el(
         'div',
         { class: 'skip-actions' },
-        el('button', { type: 'button', class: 'btn btn-small', dataset: { skip: 'later' }, onclick: () => this.setSkip('later') }, 'Recuperalo più avanti'),
-        el('button', { type: 'button', class: 'btn btn-small', dataset: { skip: 'drop' }, onclick: () => this.setSkip('drop') }, 'Toglilo per sempre'),
-        el('button', { type: 'button', class: 'btn btn-small btn-ghost', onclick: () => ((v.skipAsk = false), this._refreshChecks()) }, 'Annulla'),
+        el('button', { type: 'button', class: 'btn btn-small', dataset: { skip: 'later' }, onclick: () => this.setSkip('later') }, 'Recover it later'),
+        el('button', { type: 'button', class: 'btn btn-small', dataset: { skip: 'drop' }, onclick: () => this.setSkip('drop') }, 'Drop it for good'),
+        el('button', { type: 'button', class: 'btn btn-small btn-ghost', onclick: () => ((v.skipAsk = false), this._refreshChecks()) }, 'Cancel'),
       ),
     );
   }
@@ -555,7 +556,7 @@ export class Course {
     if (!v) return;
     v.skipAsk = false;
     this._custom((s) => (s.skip = { value, updatedAt: Date.now() }));
-    if (value) toast(value === 'drop' ? `${v.sid} tolta dal percorso` : `${v.sid} saltata: da recuperare più avanti`);
+    if (value) toast(value === 'drop' ? `${v.sid} dropped from the path` : `${v.sid} skipped: to recover later`);
   }
 
   async toggleSolutions() {
@@ -564,7 +565,7 @@ export class Course {
     if (v.solutions.hidden && !v.solutions.childElementCount) {
       const text = await readText(this.gh, this.file(v.solutionsPath));
       v.solutions.replaceChildren(
-        el('h2', { class: 'solutions-title' }, 'Soluzioni'),
+        el('h2', { class: 'solutions-title' }, 'Solutions'),
         el('article', { class: 'md' }, renderMarkdown(text, { resolveLink: this.resolver(v.solutionsPath) })),
       );
     }
@@ -583,22 +584,22 @@ export class Course {
       v.row = { ...v.row, done };
       this._refreshChecks();
       await this.onChanged?.();
-      toast(done ? `${v.sid} completata: le sue flashcard sono nel Ripasso` : `${v.sid} segnata come non completata`);
+      toast(done ? `${v.sid} done: its flashcards are now in Review` : `${v.sid} marked as not done`);
     } catch (err) {
-      toast(err.status === 0 ? 'Offline: riprova quando sei connesso' : `Non riesco ad aggiornare ${v.sid}: ${err.message}`, { error: true, ms: 6000 });
+      toast(err.status === 0 ? 'Offline: try again when you are connected' : `Could not update ${v.sid}: ${err.message}`, { error: true, ms: 6000 });
     }
   }
 }
 
-/** Tick or untick a session in PROGRESSI.md through the API, retrying on concurrent edits. */
+/** Tick or untick a session in PROGRESS.md through the API, retrying on concurrent edits. */
 export async function updateSessionDone(gh, progressPath, id, done) {
   for (let attempt = 0; attempt < 3; attempt++) {
     const file = await gh.getTextFile(progressPath);
     const updated = file && setSessionDone(file.text, id, done);
-    if (!updated) throw new Error(`${id} non trovata`);
+    if (!updated) throw new Error(`${id} not found`);
     if (updated === file.text) return;
     try {
-      await gh.putFile(progressPath, { text: updated }, file.sha, `reader: ${id} ${done ? 'completata' : 'riaperta'}`);
+      await gh.putFile(progressPath, { text: updated }, file.sha, `reader: ${id} ${done ? 'done' : 'reopened'}`);
       return;
     } catch (err) {
       if ((err.status === 409 || err.status === 422) && attempt < 2) continue;

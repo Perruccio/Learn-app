@@ -7,10 +7,10 @@ import { APP, ORIGIN, CONTENT_DIR, FIXTURES, SHOTS, devices, launch } from '../l
 const gitSha = (b) => crypto.createHash('sha1').update(Buffer.concat([Buffer.from(`blob ${b.length}\0`), b])).digest('hex');
 const repo = new Map();
 const put = (p, b) => repo.set(p, { buf: b, sha: gitSha(b) });
-put('matematica/libri/malicious.pdf', fs.readFileSync(path.join(FIXTURES, 'malicious.pdf')));
-put('matematica/libri/fake.pdf', Buffer.from('<html><script>window.__pwned=1</script></html>'));
+put('math/books/malicious.pdf', fs.readFileSync(path.join(FIXTURES, 'malicious.pdf')));
+put('math/books/fake.pdf', Buffer.from('<html><script>window.__pwned=1</script></html>'));
 put(
-  'matematica/libri/malicious.annotazioni.json',
+  'math/books/malicious.annotations.json',
   Buffer.from(
     JSON.stringify({
       version: 1,
@@ -78,7 +78,7 @@ await page.fill('#setup-form [name=token]', 't');
 await page.click('#setup-submit');
 await page.waitForSelector('.book-card');
 
-await page.evaluate(() => (location.hash = '#read=matematica/libri/malicious.pdf'));
+await page.evaluate(() => (location.hash = '#read=math/books/malicious.pdf'));
 await page.waitForSelector('.page[data-page-number="1"] .textLayer span');
 await page.waitForTimeout(2500);
 
@@ -108,9 +108,9 @@ check('external link asks for confirmation with full URL', dialogs.some((d) => d
 check('dismissed link does not open', popups.length === 0, popups.join(','));
 
 // A non-PDF disguised as .pdf must not run anything
-await page.evaluate(() => (location.hash = '#read=matematica/libri/fake.pdf'));
+await page.evaluate(() => (location.hash = '#read=math/books/fake.pdf'));
 await page.waitForSelector('#reader-loading.is-error:not([hidden])', { timeout: 15000 });
-check('fake PDF rejected', /Impossibile aprire/.test(await page.textContent('#reader-loading-text')));
+check('fake PDF rejected', /Cannot open/.test(await page.textContent('#reader-loading-text')));
 check('fake PDF did not execute', (await page.evaluate(() => window.__pwned)) === undefined);
 
 check('no requests to third-party hosts', outbound.length === 0, outbound.join(', '));
@@ -125,7 +125,7 @@ await framePage.setContent(`<iframe id="f" src="${APP}" width="800" height="600"
 await framePage.waitForTimeout(2500);
 const framed = framePage.frames().find((f) => f.url().startsWith(ORIGIN));
 const framedText = framed ? await framed.evaluate(() => document.body.innerText) : '';
-check('app refuses to run inside a frame', /non può essere aperto/.test(framedText), framedText.slice(0, 60));
+check('app refuses to run inside a frame', /cannot be opened/.test(framedText), framedText.slice(0, 60));
 
 // "Don't remember" keeps the token out of localStorage
 const ctx2 = await browser.newContext();

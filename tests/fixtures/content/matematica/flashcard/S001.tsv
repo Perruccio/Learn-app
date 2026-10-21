@@ -1,7 +1,0 @@
-#separator:tab
-#html:true
-#deck:Test::LA
-#tags column:3
-Quanto vale \(\det I_n\)?	\(1\)	S001 LA
-Definizione di \(\operatorname{span}\)?	L'insieme delle combinazioni lineari \(\sum_i \alpha_i v_i\).	S001 LA
-Traccia di \(\begin{pmatrix} 1 & 2 \\ 3 & 4 \end{pmatrix}\)?	\(5\)	S001 LA

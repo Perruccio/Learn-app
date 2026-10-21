@@ -21,6 +21,6 @@ await page.reload();
 await page.waitForTimeout(2500);
 const n = loads - before;
 check('app reloads itself once when a new version is deployed (no loop)', n === 2, `loads=${n}`);
-check('then offers a manual update', /nuova versione/.test(await page.evaluate(() => document.querySelector('#toasts')?.textContent || '')));
+check('then offers a manual update', /new version/.test(await page.evaluate(() => document.querySelector('#toasts')?.textContent || '')));
 await browser.close();
 finish();
