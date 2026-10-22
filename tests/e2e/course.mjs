@@ -69,13 +69,25 @@ const katexInfo = await A.page.evaluate(() => ({ ok: document.querySelectorAll('
 check('formulas rendered with KaTeX', katexInfo.ok > 3 && katexInfo.bad === 0, JSON.stringify(katexInfo));
 const steps = await A.page.$$eval('.stepper .step', (n) => n.map((x) => x.textContent.trim()));
 check('stepper with the 4 phases of the session', steps.length === 4 && /Review/.test(steps[0]) && /Pretest/.test(steps[1]) && /Theory/.test(steps[2]) && /Exercises/.test(steps[3]), steps.join(' | '));
-const links = await A.page.evaluate(() => [...document.querySelectorAll('.md a')].map((a) => [a.textContent.trim(), a.getAttribute('href'), a.target]));
+const links = await A.page.evaluate(() => [...document.querySelectorAll('.md a')].map((a) => [a.textContent.trim(), a.getAttribute('href'), a.target, a.rel]));
 const reader = links.find(([t]) => /reader/i.test(t));
 const colab = links.find(([t]) => /Colab/.test(t));
 const solLink = links.find(([, h]) => h && h.includes('solutions'));
 check('reader link stays in the app', reader && /^#read=math\/books\/[^/]+\.pdf$/.test(reader[1]), String(reader));
 check('notebook link opens Colab in a new tab', colab && colab[1].startsWith('https://colab.research.google.com/') && colab[2] === '_blank', String(colab));
 check('links to other files stay in the app', solLink && solLink[1].startsWith('#doc=math/solutions/'), String(solLink));
+check('every content link opens in a new tab', links.length > 0 && links.every(([, , tgt]) => tgt === '_blank'), JSON.stringify(links.filter(([, , tgt]) => tgt !== '_blank')));
+check('only app routes keep the opener; external links are noopener', links.every(([, h, , rel]) => (h.startsWith('#') ? rel === 'opener' : /noopener/.test(rel) && /noreferrer/.test(rel))), JSON.stringify(links.map(([, h, , r]) => [h.slice(0, 30), r])));
+{
+  await A.page.evaluate(() => sessionStorage.setItem('learnreader:probe', '1'));
+  const [popup] = await Promise.all([A.page.context().waitForEvent('page'), A.page.click(`.md a[href="${reader[1]}"]`)]);
+  await popup.waitForSelector('#view-reader:not([hidden])', { timeout: 15000 }).catch(() => {});
+  const popupView = await popup.evaluate(() => document.body.dataset.view);
+  check('reader link opens the reader in a new tab, the session stays open', popupView === 'reader' && /S001/.test(await A.page.textContent('#course-title')), popupView);
+  check('tab-only storage (token not remembered) reaches the new tab', (await popup.evaluate(() => sessionStorage.getItem('learnreader:probe'))) === '1');
+  await A.page.evaluate(() => sessionStorage.removeItem('learnreader:probe'));
+  await popup.close();
+}
 await A.page.screenshot({ path: `${SHOTS}/c1-session.png` });
 
 // One tap = "I got here": tapping phase 3 marks 1–3 done

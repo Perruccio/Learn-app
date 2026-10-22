@@ -6,7 +6,7 @@
 // emphasis, inline code, fenced code, links, ordered/unordered nested lists,
 // GFM tables, blockquotes, horizontal rules.
 
-import { mathNode } from './cards.js?v=16e8e35a2e34';
+import { mathNode } from './cards.js?v=1b5502b95aac';
 
 const ALLOWED_PROTOCOLS = ['http:', 'https:', 'mailto:'];
 
@@ -264,10 +264,12 @@ function appendInline(parent, text, opts) {
         if (target) {
           const a = document.createElement('a');
           a.href = target.href;
-          if (target.external) {
-            a.target = '_blank';
-            a.rel = 'noopener noreferrer';
-          }
+          // Every content link opens in a new tab, so the page being studied stays open.
+          a.target = '_blank';
+          // App routes (same origin, always a "#..." hash) keep the opener: the browser then copies
+          // sessionStorage, so a token kept only for this tab ("don't remember") works in the new tab.
+          // Anything else is cut off from this window.
+          a.rel = !target.external && target.href.startsWith('#') ? 'opener' : 'noopener noreferrer';
           appendInline(a, m[1], opts);
           parent.append(a);
         } else {
