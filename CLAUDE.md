@@ -37,7 +37,8 @@ that can write to the private repo, so:
    (in Claude cloud sessions use `PW_CHROMIUM_PATH=/opt/pw-browsers/chromium`, or
    `/opt/pw-browsers/chromium/chrome-linux/chrome` if that is a directory layout; never run `playwright install` there).
    Optionally also against the real course: `CONTENT_DIR=/path/to/Learn node run-all.mjs review course`.
-4. Commit and push to `main`; CI (`.github/workflows/ci.yml`) tests and deploys to Pages.
+4. Commit and push to `main` (or work on a branch, then merge it into `main` and delete it, remote and
+   local: no leftover branches); CI (`.github/workflows/ci.yml`) tests and deploys to Pages.
    GitHub Actions are pinned to full commit SHAs.
 
 Test fixtures in `tests/fixtures/` are synthetic: never copy private content from `Perruccio/Learn`
