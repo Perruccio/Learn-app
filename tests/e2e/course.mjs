@@ -15,7 +15,9 @@ const gitSha = (b) => crypto.createHash('sha1').update(Buffer.concat([Buffer.fro
 const repo = new Map();
 const put = (p, b) => repo.set(p, { buf: Buffer.from(b), sha: gitSha(Buffer.from(b)) });
 const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((d) => (d.isDirectory() ? (d.name === '.git' ? [] : walk(path.join(dir, d.name))) : [path.join(dir, d.name)]));
-for (const f of walk(LEARN)) if (/\.(md|tsv|ipynb)$/.test(f)) put(path.relative(LEARN, f), fs.readFileSync(f));
+// Start from a fresh path (every session to do), so the suite also runs on a course in progress.
+const untick = (text) => text.replace(/^\| \[[xX]\] \|/gm, '| [ ] |');
+for (const f of walk(LEARN)) if (/\.(md|tsv|ipynb)$/.test(f)) put(path.relative(LEARN, f), /(^|\/)PROGRESS\.md$/.test(f) ? untick(fs.readFileSync(f, 'utf8')) : fs.readFileSync(f));
 put('math/evil.md', '# Evil\n\n<script>window.__pwned=1</script>\n\n<img src=x onerror="window.__pwned=1">\n\n[click](javascript:window.__pwned=1) [data](data:text/html,hi) $\\href{javascript:alert(1)}{x}$\n\n| a | b |\n|---|---|\n| <b onclick="window.__pwned=1">x</b> | y |\n');
 const puts = [];
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Authorization, Content-Type, Accept', 'Access-Control-Allow-Methods': 'GET, PUT, OPTIONS' };

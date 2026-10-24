@@ -8,7 +8,9 @@ const LEARN = path.join(CONTENT_DIR, 'math');
 const gitSha = (b) => crypto.createHash('sha1').update(Buffer.concat([Buffer.from(`blob ${b.length}\0`), b])).digest('hex');
 const repo = new Map();
 const put = (p, b) => repo.set(p, { buf: Buffer.from(b), sha: gitSha(Buffer.from(b)) });
-put('math/PROGRESS.md', fs.readFileSync(`${LEARN}/PROGRESS.md`));
+// Start from a fresh path (every session to do), so the suite also runs on a course in progress.
+const untick = (text) => text.replace(/^\| \[[xX]\] \|/gm, '| [ ] |');
+put('math/PROGRESS.md', untick(fs.readFileSync(`${LEARN}/PROGRESS.md`, 'utf8')));
 // Only session card files: the always-on files below are synthetic, so the counts are known.
 for (const f of fs.readdirSync(`${LEARN}/flashcards`).filter((f) => /^[A-Z]\d+\.tsv$/.test(f))) put(`math/flashcards/${f}`, fs.readFileSync(`${LEARN}/flashcards/${f}`));
 put('math/books/README.md', 'x');
