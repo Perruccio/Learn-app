@@ -71,10 +71,12 @@ const steps = await A.page.$$eval('.stepper .step', (n) => n.map((x) => x.textCo
 check('stepper with the 4 phases of the session', steps.length === 4 && /Review/.test(steps[0]) && /Pretest/.test(steps[1]) && /Theory/.test(steps[2]) && /Exercises/.test(steps[3]), steps.join(' | '));
 const links = await A.page.evaluate(() => [...document.querySelectorAll('.md a')].map((a) => [a.textContent.trim(), a.getAttribute('href'), a.target, a.rel]));
 const reader = links.find(([t]) => /reader/i.test(t));
-const colab = links.find(([t]) => /Colab/.test(t));
+const codespaces = links.find(([t]) => /Codespaces/.test(t));
+const notebook = links.find(([t]) => /\.ipynb$/.test(t));
 const solLink = links.find(([, h]) => h && h.includes('solutions'));
 check('reader link stays in the app', reader && /^#read=math\/books\/[^/]+\.pdf$/.test(reader[1]), String(reader));
-check('notebook link opens Colab in a new tab', colab && colab[1].startsWith('https://colab.research.google.com/') && colab[2] === '_blank', String(colab));
+check('notebook link opens Codespaces in a new tab', codespaces && /^https:\/\/codespaces\.new\/[^/?#]+\/[^/?#]+\?quickstart=1$/.test(codespaces[1]) && codespaces[2] === '_blank', String(codespaces));
+check('relative notebook link resolves to Codespaces, not Colab', notebook && notebook[1] === 'https://codespaces.new/Perruccio/Learn?quickstart=1' && notebook[2] === '_blank', String(notebook));
 check('links to other files stay in the app', solLink && solLink[1].startsWith('#doc=math/solutions/'), String(solLink));
 check('every content link opens in a new tab', links.length > 0 && links.every(([, , tgt]) => tgt === '_blank'), JSON.stringify(links.filter(([, , tgt]) => tgt !== '_blank')));
 check('only app routes keep the opener; external links are noopener', links.every(([, h, , rel]) => (h.startsWith('#') ? rel === 'opener' : /noopener/.test(rel) && /noreferrer/.test(rel))), JSON.stringify(links.map(([, h, , r]) => [h.slice(0, 30), r])));

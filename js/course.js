@@ -5,9 +5,9 @@
 // session, personal to-dos and the error log are stored in "<base>/state.json"
 // (synced like annotations).
 
-import { el, dirName, toast, uid } from './util.js?v=1b5502b95aac';
-import { loadMath, parseProgress, readText, setSessionDone } from './cards.js?v=1b5502b95aac';
-import { joinPath, renderMarkdown } from './markdown.js?v=1b5502b95aac';
+import { el, dirName, toast, uid } from './util.js?v=333a97a613c7';
+import { loadMath, parseProgress, readText, setSessionDone } from './cards.js?v=333a97a613c7';
+import { joinPath, renderMarkdown } from './markdown.js?v=333a97a613c7';
 
 const SESSION_ID = /^[A-Z]\d{2,4}$/;
 const ID_RE = /^[a-z0-9]{4,24}$/;
@@ -191,7 +191,12 @@ export class Course {
       const path = joinPath(dir, href.split('#')[0]);
       if (/\.md$/i.test(path)) return { href: `#doc=${path}`, external: false };
       if (/\.pdf$/i.test(path)) return { href: `#read=${path}`, external: false };
-      if (/\.ipynb$/i.test(path)) return { href: `https://colab.research.google.com/github/${owner}/${repo}/blob/${branch}/${path}`, external: true };
+      // Notebooks run in GitHub Codespaces (works with private repos; Colab does not without a
+      // broad OAuth grant). quickstart=1 resumes the latest codespace instead of creating one.
+      if (/\.ipynb$/i.test(path)) {
+        const tree = branch === 'main' ? '' : `/tree/${branch.split('/').map(encodeURIComponent).join('/')}`;
+        return { href: `https://codespaces.new/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}${tree}?quickstart=1`, external: true };
+      }
       return null;
     };
   }

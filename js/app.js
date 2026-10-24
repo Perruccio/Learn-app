@@ -1,15 +1,15 @@
 // App shell: configuration, routing, library and sync triggers.
 
-import { $, el, debounce, dirName, formatSize, prettyName, storage, toast } from './util.js?v=1b5502b95aac';
-import { GitHub } from './github.js?v=1b5502b95aac';
-import { SyncManager, liveAnnotations, migrateLegacyStorage } from './sync.js?v=1b5502b95aac';
-import { Reader, isPdfCached } from './reader.js?v=1b5502b95aac';
-import { loadDecks, loadMath, progressCodec, tickSession } from './cards.js?v=1b5502b95aac';
-import { ReviewSession, summarize } from './review.js?v=1b5502b95aac';
-import { Course, skipOf, stateCodec } from './course.js?v=1b5502b95aac';
+import { $, el, debounce, dirName, formatSize, prettyName, storage, toast } from './util.js?v=333a97a613c7';
+import { GitHub } from './github.js?v=333a97a613c7';
+import { SyncManager, liveAnnotations, migrateLegacyStorage } from './sync.js?v=333a97a613c7';
+import { Reader, isPdfCached } from './reader.js?v=333a97a613c7';
+import { loadDecks, loadMath, progressCodec, tickSession } from './cards.js?v=333a97a613c7';
+import { ReviewSession, summarize } from './review.js?v=333a97a613c7';
+import { Course, skipOf, stateCodec } from './course.js?v=333a97a613c7';
 
 // Stamped by scripts/stamp.py on every release (do not edit by hand).
-const APP_VERSION = '1b5502b95aac';
+const APP_VERSION = '333a97a613c7';
 const CONFIG_KEY = 'learnreader:config';
 const MAX_UPLOAD_BYTES = 95 * 1024 * 1024;
 
