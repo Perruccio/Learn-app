@@ -45,6 +45,12 @@ into this public repo.
 
 ## Content formats the app relies on (defined in the Learn repo)
 
+- Subjects: every folder with a `PROGRESS.md` is a subject (`math/`, `quantfinance/`, ...), with its own
+  sessions, flashcards, books, `state.json`. With several subjects the home (`#`) shows one card per
+  subject (progress, next session, cards due) and `#s=<folder>` opens one; `#path` and `#review` take
+  `&s=<folder>` (`#review` alone = all subjects). With one subject the app opens it directly. Its name is
+  the first heading of `<folder>/README.md` (trailing "study" dropped), else the folder name. Uploads go
+  to `<folder>/books` of the current subject. Paths below use `math/` as the example.
 - `math/PROGRESS.md`: table rows `| [ ] | [S001](sessions/S001.md) | LinAlg-01 | Title |`;
   a row without a link = session not prepared yet. Track codes are words before the dash
   (`LinAlg`, `Prob`, `FuncAn`, `Stat`, `Opt`); anything else (e.g. `Mixed`) is grouped as `Mixed`.
@@ -54,8 +60,8 @@ into this public repo.
 - `math/flashcards/*.tsv`: Anki-style TSV with `#separator:tab` headers; session cards unlock
   when the session is ticked. `ERR-*` and `HL-*` files (and legacy `EVID-*`) are always active.
 - `math/state.json`, `flashcards/progress.json`, `<pdf>.annotations.json`: written by the app.
-  Books in `math/books/` (default upload folder).
-- Hash routes: `#read=<pdf>&page=n`, `#doc=<md>`, `#path`, `#review`, `#setup`; the old `#percorso`
+  Books in `<subject>/books/` (default upload folder).
+- Hash routes: `#read=<pdf>&page=n`, `#doc=<md>`, `#s=<subject>`, `#path`, `#review` (both with optional `&s=`), `#setup`; the old `#percorso`
   and `#ripasso` redirect to `#path` and `#review`.
 
 ## Repositories

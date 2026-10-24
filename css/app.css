@@ -471,6 +471,10 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
 
 /* ------------------------------------------------------------------ home panels */
 
+.home-title { margin: 0; font-size: 20px; font-weight: 680; letter-spacing: -0.01em; flex: 1; }
+.subject-card .next-title { font-size: 15px; font-weight: 560; }
+.home-review { margin-bottom: 24px; }
+#lib-home { margin-left: -8px; }
 .home-panels { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); margin-bottom: 24px; }
 .panel-card {
   background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px;

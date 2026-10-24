@@ -9,6 +9,7 @@ with `api.github.com` mocked inside the browser context (no network, no token, n
 | `security` | malicious PDF (JS, XFA, links), CSP, sanitization of synced JSON |
 | `review` | flashcards: unlock on session completion, FSRS review, KaTeX, hostile card content, sync |
 | `course` | progress page, session stepper, to-dos, error log, solutions, completion, hostile markdown |
+| `subjects` | several subjects: home dashboard, per-subject library, path, review, upload folder, hostile `s=` |
 | `upload` | PDF upload via the Git Data API, concurrent push, rejected inputs |
 | `update` | a newer `version.json` reloads the app exactly once |
 | `perf` | optional benchmark, runs only with `BIG_PDF=/path/to/large.pdf` |

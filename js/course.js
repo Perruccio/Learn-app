@@ -5,9 +5,9 @@
 // session, personal to-dos and the error log are stored in "<base>/state.json"
 // (synced like annotations).
 
-import { el, dirName, toast, uid } from './util.js?v=333a97a613c7';
-import { loadMath, parseProgress, readText, setSessionDone } from './cards.js?v=333a97a613c7';
-import { joinPath, renderMarkdown } from './markdown.js?v=333a97a613c7';
+import { el, dirName, toast, uid } from './util.js?v=7671404f58f4';
+import { loadMath, parseProgress, readText, setSessionDone } from './cards.js?v=7671404f58f4';
+import { joinPath, renderMarkdown } from './markdown.js?v=7671404f58f4';
 
 const SESSION_ID = /^[A-Z]\d{2,4}$/;
 const ID_RE = /^[a-z0-9]{4,24}$/;
@@ -99,6 +99,27 @@ export const stateCodec = {
 
 // ------------------------------------------------------------------ helpers
 
+// ------------------------------------------------------------------ subjects
+
+const PROGRESS_RE = /(^|\/)PROGRESS\.md$/;
+
+/** Subjects = folders holding a PROGRESS.md ("math", "quantfinance", ...; '' for the repository root). */
+export function subjectsOf(files) {
+  return [...new Set((files || []).filter((f) => PROGRESS_RE.test(f.path)).map((f) => dirName(f.path)))].sort((a, b) => a.localeCompare(b, 'en'));
+}
+
+/** Whether a path lies inside the folder of a subject. */
+export function inSubject(base, path) {
+  return base === '' || path === base || path.startsWith(`${base}/`);
+}
+
+/** Subject a path belongs to (the deepest subject folder containing it), or null. */
+export function subjectOf(files, path) {
+  let best = null;
+  for (const base of subjectsOf(files)) if (inSubject(base, path) && (best === null || base.length > best.length)) best = base;
+  return best;
+}
+
 /** How a session was skipped: 'later', 'drop' or null. */
 export function skipOf(doc, sid) {
   return doc.sessions[sid]?.skip?.value || null;
@@ -113,7 +134,7 @@ function plain(markdown) {
     .trim();
 }
 
-function progressBar(fraction, label) {
+export function progressBar(fraction, label) {
   return el(
     'div',
     { class: 'pbar', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(Math.round(fraction * 100)), 'aria-label': label },
@@ -182,8 +203,13 @@ export class Course {
     const { owner, repo, branch } = this.cfg;
     return (href) => {
       if (/^https?:/i.test(href)) {
-        const internal = this.appLink(href);
-        return internal ? { href: internal.startsWith('#') ? internal : `#${internal}`, external: false } : { href, external: true };
+        let internal = this.appLink(href);
+        if (internal === null) return { href, external: true };
+        if (!internal.startsWith('#')) internal = `#${internal}`;
+        // "#review" / "#path" from a subject's page stay within that subject.
+        const subject = subjectOf(this.allFiles, currentPath);
+        if (subject !== null && subjectsOf(this.allFiles).length > 1 && /^#(review|path)$/.test(internal)) internal += `&s=${encodeURIComponent(subject)}`;
+        return { href: internal, external: false };
       }
       if (/^mailto:/i.test(href)) return { href, external: true };
       if (href.startsWith('#')) return { href: `#doc=${encodeURIComponent(currentPath)}`, external: false };
@@ -203,9 +229,10 @@ export class Course {
 
   // ------------------------------------------------------------------ progress view
 
-  async renderProgress(container) {
+  /** Progress of one subject (its folder), or of every subject when base is null. */
+  async renderProgress(container, base = null) {
     container.replaceChildren(el('p', { class: 'muted' }, 'Loading the path…'));
-    const tables = await this.tables();
+    const tables = (await this.tables()).filter((t) => base === null || t.base === base);
     if (!tables.length) {
       container.replaceChildren(el('p', { class: 'muted' }, 'No PROGRESS.md in the repository.'));
       return;

@@ -21,7 +21,7 @@
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="vendor/pdfjs/web/pdf_viewer.css">
   <link rel="stylesheet" href="vendor/katex/katex.min.css">
-  <link rel="stylesheet" href="css/app.css?v=333a97a613c7">
+  <link rel="stylesheet" href="css/app.css?v=7671404f58f4">
 </head>
 <body data-view="">
   <svg class="sprite" width="0" height="0" aria-hidden="true">
@@ -91,13 +91,43 @@
     </div>
   </section>
 
-  <!-- ============================== Library ============================== -->
-  <section id="view-library" class="view view-page" hidden>
+  <!-- ============================== Home: one card per subject ============================== -->
+  <section id="view-home" class="view view-page" hidden>
     <header class="lib-header">
       <div class="brand"><svg class="brand-mark"><use href="#i-book"/></svg><span>Learn Reader</span></div>
       <div class="lib-actions">
         <button type="button" class="sync-pill" data-sync-pill title="Sync now"><svg class="icon"><use href="#i-sync"/></svg><span class="sync-text">Synced</span></button>
-        <a class="icon-btn" href="#path" title="Path" aria-label="Path"><svg class="icon"><use href="#i-path"/></svg></a>
+        <a class="icon-btn" href="#setup" title="Settings" aria-label="Settings"><svg class="icon"><use href="#i-gear"/></svg></a>
+      </div>
+    </header>
+    <main class="lib-main">
+      <div class="lib-tools">
+        <h1 class="home-title">What do you study today?</h1>
+        <span class="lib-repo" id="home-repo"></span>
+      </div>
+      <p id="home-offline" class="notice" hidden>You are offline: showing the saved overview.</p>
+      <section class="home-panels" id="subject-list"></section>
+      <div class="panel-card home-review" id="home-review" hidden>
+        <div class="panel-card-head"><span class="eyebrow">All flashcards</span></div>
+        <p class="review-counts"><span class="big" id="home-rv-due">0</span> due <span class="sep">·</span> <span class="big" id="home-rv-new">0</span> new</p>
+        <div class="panel-actions">
+          <a class="btn btn-primary" id="home-rv-start" href="#review"><svg class="icon"><use href="#i-cards"/></svg>Review all subjects</a>
+        </div>
+      </div>
+      <div id="home-books" class="lib-list"></div>
+    </main>
+  </section>
+
+  <!-- ============================== Library (one subject) ============================== -->
+  <section id="view-library" class="view view-page" hidden>
+    <header class="lib-header">
+      <div class="brand">
+        <a class="icon-btn" id="lib-home" href="#" title="All subjects" aria-label="All subjects" hidden><svg class="icon"><use href="#i-back"/></svg></a>
+        <svg class="brand-mark"><use href="#i-book"/></svg><span id="lib-subject">Learn Reader</span>
+      </div>
+      <div class="lib-actions">
+        <button type="button" class="sync-pill" data-sync-pill title="Sync now"><svg class="icon"><use href="#i-sync"/></svg><span class="sync-text">Synced</span></button>
+        <a class="icon-btn" id="lib-path" href="#path" title="Path" aria-label="Path"><svg class="icon"><use href="#i-path"/></svg></a>
         <button type="button" class="icon-btn" id="btn-upload" title="Add PDF" aria-label="Add PDF"><svg class="icon"><use href="#i-upload"/></svg></button>
         <a class="icon-btn" href="#setup" title="Settings" aria-label="Settings"><svg class="icon"><use href="#i-gear"/></svg></a>
       </div>
@@ -114,7 +144,7 @@
           <p class="muted small" id="next-meta"></p>
           <div class="panel-actions">
             <a class="btn btn-primary" id="next-open">Open the session</a>
-            <a class="btn btn-ghost" href="#path">Path</a>
+            <a class="btn btn-ghost" id="next-path" href="#path">Path</a>
           </div>
         </div>
         <div class="panel-card" id="review-panel" hidden>
@@ -136,7 +166,7 @@
         <p id="upload-files" class="muted"></p>
         <label class="field">
           <span>Folder</span>
-          <input name="folder" list="upload-folders" value="math/books" spellcheck="false" autocapitalize="off">
+          <input name="folder" list="upload-folders" value="books" spellcheck="false" autocapitalize="off">
           <datalist id="upload-folders"></datalist>
         </label>
         <p class="muted small">95 MB max per file. The upload can take a few minutes.</p>
@@ -156,8 +186,8 @@
         <span class="reader-title course-title" id="course-title"></span>
       </div>
       <div class="tb-group tb-right">
-        <a class="icon-btn" href="#path" title="Path" aria-label="Path"><svg class="icon"><use href="#i-path"/></svg></a>
-        <a class="icon-btn" href="#review" title="Flashcard review" aria-label="Flashcard review"><svg class="icon"><use href="#i-cards"/></svg></a>
+        <a class="icon-btn" id="course-path" href="#path" title="Path" aria-label="Path"><svg class="icon"><use href="#i-path"/></svg></a>
+        <a class="icon-btn" id="course-review" href="#review" title="Flashcard review" aria-label="Flashcard review"><svg class="icon"><use href="#i-cards"/></svg></a>
         <button type="button" class="sync-pill compact" data-sync-pill title="Sync now"><svg class="icon"><use href="#i-sync"/></svg><span class="sync-text">Synced</span></button>
       </div>
     </header>
@@ -193,7 +223,7 @@
       <div id="review-done" class="review-done" hidden>
         <svg class="done-mark"><use href="#i-check"/></svg>
         <p id="review-done-text"></p>
-        <button type="button" class="btn btn-primary" id="review-finish">Back to the library</button>
+        <button type="button" class="btn btn-primary" id="review-finish">Done</button>
       </div>
     </main>
   </section>
@@ -306,6 +336,6 @@
 
   <div id="toasts" class="toasts" aria-live="polite"></div>
 
-  <script type="module" src="js/app.js?v=333a97a613c7"></script>
+  <script type="module" src="js/app.js?v=7671404f58f4"></script>
 </body>
 </html>

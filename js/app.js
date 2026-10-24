@@ -1,19 +1,19 @@
 // App shell: configuration, routing, library and sync triggers.
 
-import { $, el, debounce, dirName, formatSize, prettyName, storage, toast } from './util.js?v=333a97a613c7';
-import { GitHub } from './github.js?v=333a97a613c7';
-import { SyncManager, liveAnnotations, migrateLegacyStorage } from './sync.js?v=333a97a613c7';
-import { Reader, isPdfCached } from './reader.js?v=333a97a613c7';
-import { loadDecks, loadMath, progressCodec, tickSession } from './cards.js?v=333a97a613c7';
-import { ReviewSession, summarize } from './review.js?v=333a97a613c7';
-import { Course, skipOf, stateCodec } from './course.js?v=333a97a613c7';
+import { $, el, debounce, dirName, formatSize, prettyName, storage, toast } from './util.js?v=7671404f58f4';
+import { GitHub } from './github.js?v=7671404f58f4';
+import { SyncManager, liveAnnotations, migrateLegacyStorage } from './sync.js?v=7671404f58f4';
+import { Reader, isPdfCached } from './reader.js?v=7671404f58f4';
+import { loadDecks, loadMath, parseProgress, progressCodec, readText, tickSession } from './cards.js?v=7671404f58f4';
+import { ReviewSession, summarize } from './review.js?v=7671404f58f4';
+import { Course, inSubject, progressBar, skipOf, stateCodec, subjectOf, subjectsOf } from './course.js?v=7671404f58f4';
 
 // Stamped by scripts/stamp.py on every release (do not edit by hand).
-const APP_VERSION = '333a97a613c7';
+const APP_VERSION = '7671404f58f4';
 const CONFIG_KEY = 'learnreader:config';
 const MAX_UPLOAD_BYTES = 95 * 1024 * 1024;
 
-const app = { cfg: null, gh: null, sync: null, cards: null, state: null, course: null, reader: null, review: null, files: null, allFiles: null, decks: null, uploadQueue: [] };
+const app = { cfg: null, gh: null, sync: null, cards: null, state: null, course: null, reader: null, review: null, files: null, allFiles: null, decks: null, uploadQueue: [], subject: null, reviewSubject: null };
 
 // ------------------------------------------------------------------ config
 
@@ -71,9 +71,9 @@ function connect(cfg) {
     });
   }
   if (app.reader) app.reader.attach(app.sync, app.gh);
-  else app.reader = new Reader({ sync: app.sync, gh: app.gh, onBack: () => (location.hash = '') });
+  else app.reader = new Reader({ sync: app.sync, gh: app.gh, onBack: () => (location.hash = subjectHash(app.subject)) });
   if (app.review) app.review.attach(app.cards);
-  else app.review = new ReviewSession({ sync: app.cards, onExit: () => (location.hash = '') });
+  else app.review = new ReviewSession({ sync: app.cards, onExit: () => (location.hash = subjectHash(app.reviewSubject)) });
   renderSyncStatus();
 }
 
@@ -85,10 +85,65 @@ function filesKey() {
   return `learnreader:files:${app.cfg.owner}/${app.cfg.repo}@${app.cfg.branch}`;
 }
 
+// ------------------------------------------------------------------ subjects
+
+// A subject is a folder of the repository with a PROGRESS.md (math/, quantfinance/, ...).
+// With a single subject the app opens it directly; with more, the home lists them.
+
+const subjects = () => subjectsOf(app.allFiles);
+const multiSubject = () => subjects().length > 1;
+
+/** Hash of a subject's home page ('' = the app home, which is the subject itself when there is only one). */
+function subjectHash(base) {
+  return base !== null && multiSubject() ? `s=${encodeURIComponent(base)}` : '';
+}
+
+/** A route ("path", "review") scoped to a subject. */
+function withSubject(route, base) {
+  return base !== null && multiSubject() ? `${route}&s=${encodeURIComponent(base)}` : route;
+}
+
+/** Files of a subject (all files when base is null). */
+function filesOf(base) {
+  return (app.allFiles || []).filter((f) => base === null || inSubject(base, f.path));
+}
+
+const titles = new Map();
+/** Display name of a subject: the first heading of its README.md ("Math study" -> "Math"), else the folder name. */
+async function subjectTitle(base) {
+  if (base === null || base === '') return 'Learn Reader';
+  const readme = app.allFiles?.find((f) => f.path === `${base}/README.md`);
+  const key = `${base}@${readme?.sha || ''}`;
+  if (titles.has(key)) return titles.get(key);
+  let title = '';
+  try {
+    const h1 = readme ? (await readText(app.gh, readme)).match(/^#\s+(.+)$/m) : null;
+    title = h1 ? h1[1].replace(/[*_`]/g, '').replace(/\s+study$/i, '').trim().slice(0, 60) : '';
+  } catch {
+    /* offline and not cached: fall back to the folder name */
+  }
+  title ||= base.split('/').pop().replace(/[-_]+/g, ' ').replace(/^./, (c) => c.toUpperCase());
+  titles.set(key, title);
+  return title;
+}
+
+/** Next session of a subject: {next, rows, done} (first unticked, not skipped row of its PROGRESS.md). */
+async function progressOf(base) {
+  const file = app.allFiles?.find((f) => f.path === (base ? `${base}/PROGRESS.md` : 'PROGRESS.md'));
+  const all = file ? parseProgress(await readText(app.gh, file)) : [];
+  const state = app.state.load(base).doc;
+  const rows = all.filter((r) => r.done || skipOf(state, r.id) !== 'drop');
+  const next = rows.find((r) => !r.done && !skipOf(state, r.id)) || null;
+  const errors = Object.values(state.errors).filter((e) => !e.deleted && !e.card).length;
+  return { rows, next, done: rows.filter((r) => r.done).length, errors };
+}
+
+const sessionHref = (base, r) => (r?.link ? `#doc=${base ? `${base}/` : ''}${r.link}` : null);
+
 // ------------------------------------------------------------------ views & routing
 
 function showView(name) {
-  for (const v of ['setup', 'library', 'reader', 'review', 'course']) $(`#view-${v}`).hidden = v !== name;
+  for (const v of ['setup', 'home', 'library', 'reader', 'review', 'course']) $(`#view-${v}`).hidden = v !== name;
   document.body.dataset.view = name;
 }
 
@@ -112,32 +167,44 @@ function parseHash() {
     review: params.has('review'),
     progress: params.has('path'),
     doc: params.get('doc'),
+    subject: params.get('s'),
   };
 }
 
 async function route() {
   redirectAlias();
-  const { read, page, setup, review, progress, doc } = parseHash();
+  const { read, page, setup, review, progress, doc, subject: wanted } = parseHash();
   if (!app.cfg || setup) {
     await app.reader?.close();
     showSetup();
     return;
   }
+  if (!app.allFiles && (wanted !== null || !(read || doc))) await refreshFiles().catch(() => {});
+  // Only known subjects: anything else in "s=" is ignored.
+  const subject = wanted !== null && subjects().includes(wanted) ? wanted : null;
   if (read) {
+    app.subject = subjectOf(app.allFiles, read);
     await openBook(read, page);
     return;
   }
   await app.reader?.close();
   if (review) {
-    await startReview();
+    await startReview(subject);
     return;
   }
   if (progress || doc) {
-    await openCourse(doc);
+    await openCourse(doc, subject);
     return;
   }
   if (document.body.dataset.view === 'review') app.cards.syncAll();
-  document.title = 'Learn Reader';
+  if (subject === null && multiSubject()) {
+    app.subject = null;
+    document.title = 'Learn Reader';
+    showView('home');
+    renderHome();
+    return;
+  }
+  app.subject = subject ?? subjects()[0] ?? null;
   showView('library');
   renderLibrary();
 }
@@ -241,8 +308,22 @@ async function refreshFiles() {
   return app.files;
 }
 
+/** Header of a subject's page: its name, a way back to the home, links scoped to it. */
+async function drawSubjectHeader() {
+  const base = app.subject;
+  $('#lib-home').hidden = !multiSubject();
+  $('#lib-path').href = `#${withSubject('path', base)}`;
+  $('#next-path').href = `#${withSubject('path', base)}`;
+  $('#rv-start').href = `#${withSubject('review', base)}`;
+  const title = await subjectTitle(base);
+  if (base !== app.subject) return;
+  $('#lib-subject').textContent = title;
+  document.title = base ? `${title} · Learn Reader` : 'Learn Reader';
+}
+
 async function renderLibrary() {
   $('#lib-repo').textContent = `${app.cfg.owner}/${app.cfg.repo}`;
+  drawSubjectHeader();
   const list = $('#library-list');
   if (app.files) {
     drawLibrary();
@@ -251,6 +332,12 @@ async function renderLibrary() {
   try {
     await refreshFiles();
     $('#library-offline').hidden = true;
+    if (document.body.dataset.view !== 'library') return;
+    if (app.subject === null && subjects().length) {
+      route(); // first load: the subjects are known only now
+      return;
+    }
+    drawSubjectHeader();
     drawLibrary();
     renderHomePanels();
   } catch (err) {
@@ -264,17 +351,30 @@ async function renderLibrary() {
   }
 }
 
+/** Default upload folder: the books/ folder of the current subject. */
+function booksFolder() {
+  return app.subject ? `${app.subject}/books` : 'books';
+}
+
+/** PDFs of the current subject's page. */
+function libraryFiles() {
+  // With a single subject there is no home: books outside every subject folder show here too.
+  const loose = !multiSubject();
+  return (app.files || []).filter((f) => app.subject === null || inSubject(app.subject, f.path) || (loose && subjectOf(app.allFiles, f.path) === null));
+}
+
 function drawLibrary() {
   const list = $('#library-list');
   const query = $('#lib-search').value.trim().toLowerCase();
-  const files = (app.files || []).filter((f) => !query || f.path.toLowerCase().includes(query));
-  if (!app.files?.length) {
+  const own = libraryFiles();
+  const files = own.filter((f) => !query || f.path.toLowerCase().includes(query));
+  if (!own.length) {
     list.replaceChildren(
       el(
         'div',
         { class: 'lib-empty' },
-        el('p', {}, 'No PDFs in the repository.'),
-        el('p', { class: 'muted' }, 'Add books with the ↑ button above, or upload them to the ', el('code', {}, 'math/books'), ' folder of the repository.'),
+        el('p', {}, 'No PDFs yet.'),
+        el('p', { class: 'muted' }, 'Add books with the ↑ button above: they go to the ', el('code', {}, booksFolder()), ' folder.'),
       ),
     );
     return;
@@ -283,9 +383,14 @@ function drawLibrary() {
     list.replaceChildren(el('p', { class: 'muted lib-empty' }, 'No book matches the search.'));
     return;
   }
+  list.replaceChildren(...bookSections(files));
+}
+
+/** Book cards grouped by folder. */
+function bookSections(files) {
   const groups = new Map();
   for (const f of files) {
-    const dir = dirName(f.path) || '(root)';
+    const dir = dirName(f.path) || 'Other books';
     if (!groups.has(dir)) groups.set(dir, []);
     groups.get(dir).push(f);
   }
@@ -328,7 +433,7 @@ function drawLibrary() {
       ),
     );
   }
-  list.replaceChildren(...sections);
+  return sections;
 }
 
 // ------------------------------------------------------------------ home panels: next session and flashcards
@@ -339,24 +444,29 @@ async function renderHomePanels({ pull = true } = {}) {
   const token = ++panelsToken;
   let decks;
   try {
-    decks = await loadDecks(app.gh, app.allFiles);
+    decks = await loadDecks(app.gh, filesOf(app.subject));
   } catch {
     return; // offline and texts not cached yet
   }
   if (token !== panelsToken) return;
   app.decks = decks;
 
-  // Next session = first unticked, not skipped row of the first progress table.
-  const table = decks.dirs.find((d) => d.rows.length) || null;
-  const base = table ? dirName(table.progressFile.path) : '';
-  const state = table ? app.state.load(base).doc : null;
-  const rows = table ? table.rows.filter((r) => r.done || skipOf(state, r.id) !== 'drop') : [];
-  const next = rows.find((r) => !r.done && !skipOf(state, r.id)) || null;
+  const base = app.subject ?? subjects()[0] ?? null;
+  let progress = { rows: [], next: null, done: 0 };
+  if (base !== null) {
+    try {
+      progress = await progressOf(base);
+    } catch {
+      /* offline and not cached yet */
+    }
+  }
+  if (token !== panelsToken) return;
+  const { next, rows, done } = progress;
   $('#next-session').hidden = !next;
   if (next) {
     $('#next-title').textContent = `${next.id} · ${next.title}`;
-    $('#next-meta').textContent = `${next.track} · ${rows.filter((r) => r.done).length} of ${rows.length} done`;
-    const link = next.link ? `#doc=${base ? `${base}/` : ''}${next.link}` : null;
+    $('#next-meta').textContent = `${next.track} · ${done} of ${rows.length} done`;
+    const link = sessionHref(base, next);
     $('#next-open').hidden = !link;
     if (link) $('#next-open').href = link;
   }
@@ -387,17 +497,85 @@ function drawReviewPanel(decks) {
   $('#rv-start').classList.toggle('is-disabled', s.due + s.fresh === 0);
 }
 
-async function openCourse(docPath) {
+// ------------------------------------------------------------------ home: one card per subject
+
+let homeToken = 0;
+async function renderHome({ pull = true } = {}) {
+  const token = ++homeToken;
+  $('#home-repo').textContent = `${app.cfg.owner}/${app.cfg.repo}`;
+  let decks = null;
+  try {
+    decks = await loadDecks(app.gh, app.allFiles || []);
+  } catch {
+    /* offline and texts not cached yet: show the cards without counts */
+  }
+  const cards = [];
+  for (const base of subjects()) {
+    let progress = { rows: [], next: null, done: 0, errors: 0 };
+    try {
+      progress = await progressOf(base);
+    } catch {
+      /* offline and not cached */
+    }
+    const s = decks ? summarize({ cards: decks.cards.filter((c) => inSubject(base, c.dir)) }, app.cards) : null;
+    cards.push({ base, title: await subjectTitle(base), ...progress, review: s });
+  }
+  if (token !== homeToken || document.body.dataset.view !== 'home') return;
+  $('#subject-list').replaceChildren(
+    ...cards.map((c) => {
+      const nextHref = sessionHref(c.base, c.next);
+      const facts = [];
+      if (c.review && c.review.due + c.review.fresh) facts.push(`${c.review.due} due · ${c.review.fresh} new flashcards`);
+      if (c.errors) facts.push(`${c.errors} ${c.errors === 1 ? 'error' : 'errors'} to turn into cards`);
+      return el(
+        'section',
+        { class: 'panel-card subject-card', 'data-subject': c.base },
+        el('div', { class: 'panel-card-head' }, el('span', { class: 'eyebrow' }, c.title)),
+        el('p', { class: 'review-counts' }, el('span', { class: 'big' }, String(c.done)), ` of ${c.rows.length} sessions done`),
+        progressBar(c.rows.length ? c.done / c.rows.length : 0, `${c.title} progress`),
+        el('p', { class: 'next-title' }, c.next ? `Next: ${c.next.id} · ${c.next.title}` : c.rows.length ? 'All prepared sessions done.' : 'No session yet.'),
+        facts.length ? el('p', { class: 'muted small' }, facts.join(' · ')) : null,
+        el(
+          'div',
+          { class: 'panel-actions' },
+          el('a', { class: 'btn btn-primary', href: `#${subjectHash(c.base)}` }, `Open ${c.title}`),
+          nextHref ? el('a', { class: 'btn btn-ghost', href: nextHref }, 'Next session') : null,
+        ),
+      );
+    }),
+  );
+  const total = cards.reduce((t, c) => ({ due: t.due + (c.review?.due || 0), fresh: t.fresh + (c.review?.fresh || 0) }), { due: 0, fresh: 0 });
+  $('#home-review').hidden = !decks?.cards.length;
+  $('#home-rv-due').textContent = total.due;
+  $('#home-rv-new').textContent = total.fresh;
+  $('#home-rv-start').classList.toggle('is-disabled', total.due + total.fresh === 0);
+  // Books outside every subject folder.
+  const loose = pdfsOf(app.allFiles || []).filter((f) => subjectOf(app.allFiles, f.path) === null);
+  $('#home-books').replaceChildren(...(loose.length ? bookSections(loose) : []));
+  if (pull) {
+    const refresh = async () => {
+      try {
+        await refreshFiles();
+        $('#home-offline').hidden = true;
+      } catch (err) {
+        $('#home-offline').hidden = err.status !== 0;
+      }
+      await Promise.allSettled([...subjects().map((b) => app.state.sync(b)), ...(decks?.dirs || []).map((d) => app.cards.sync(d.dir))]);
+    };
+    await refresh();
+    if (token === homeToken && document.body.dataset.view === 'home') {
+      if (!multiSubject()) route();
+      else renderHome({ pull: false });
+    }
+  }
+}
+
+async function openCourse(docPath, subject = null) {
   showView('course');
   const main = $('#course-main');
   const setTitle = (text) => {
     $('#course-title').textContent = text;
     document.title = `${text} · Learn Reader`;
-  };
-  $('#course-back').onclick = () => {
-    if (docPath && /\/sessions\//.test(docPath)) location.hash = 'path';
-    else if (docPath) history.length > 1 ? history.back() : (location.hash = 'path');
-    else location.hash = '';
   };
   try {
     if (!app.allFiles) await refreshFiles();
@@ -407,14 +585,23 @@ async function openCourse(docPath) {
       return;
     }
   }
+  const base = docPath ? subjectOf(app.allFiles, docPath) : subject;
+  app.subject = base;
+  $('#course-path').href = `#${withSubject('path', base)}`;
+  $('#course-review').href = `#${withSubject('review', base)}`;
+  $('#course-back').onclick = () => {
+    if (docPath && /\/sessions\//.test(docPath)) location.hash = withSubject('path', base);
+    else if (docPath) history.length > 1 ? history.back() : (location.hash = withSubject('path', base));
+    else location.hash = subjectHash(base);
+  };
   main.scrollTop = 0;
   if (!docPath) {
-    setTitle('Path');
-    await app.course.renderProgress(main);
+    setTitle(base !== null && multiSubject() ? `${await subjectTitle(base)} · Path` : 'Path');
+    await app.course.renderProgress(main, base !== null && multiSubject() ? base : null);
     // Pull checklist state from other devices, then refresh the view.
-    const bases = [...new Set(app.allFiles.filter((f) => /(^|\/)PROGRESS\.md$/.test(f.path)).map((f) => dirName(f.path)))];
+    const bases = subjects().filter((b) => base === null || !multiSubject() || b === base);
     Promise.allSettled(bases.map((b) => app.state.sync(b))).then(() => {
-      if (parseHash().progress) app.course.renderProgress(main);
+      if (parseHash().progress) app.course.renderProgress(main, base !== null && multiSubject() ? base : null);
     });
     return;
   }
@@ -427,19 +614,22 @@ async function openCourse(docPath) {
   if (sessionBase !== null) app.state.sync(sessionBase).catch(() => {});
 }
 
-async function startReview() {
+/** Review the flashcards of one subject, or of all of them when subject is null. */
+async function startReview(subject = null) {
   showView('review');
+  app.reviewSubject = subject;
+  if (subject !== null) app.subject = subject;
   document.title = 'Review · Learn Reader';
   $('#review-count').textContent = 'Loading cards…';
   $('#review-stage').hidden = true;
   $('#review-done').hidden = true;
   try {
     if (!app.allFiles) await refreshFiles();
-    app.decks = await loadDecks(app.gh, app.allFiles);
+    app.decks = await loadDecks(app.gh, filesOf(subject));
   } catch (err) {
     if (!app.decks) {
       toast(err.status === 0 ? 'Offline, and the cards have not been downloaded yet' : err.message, { error: true });
-      location.hash = '';
+      location.hash = subjectHash(subject);
       return;
     }
   }
@@ -481,8 +671,9 @@ function bindUpload() {
     input.value = '';
     if (!app.uploadQueue.length) return;
     $('#upload-files').textContent = app.uploadQueue.map((f) => `${f.name} (${formatSize(f.size)})`).join(', ');
-    const folders = new Set(['math/books', ...(app.files || []).map((f) => dirName(f.path)).filter(Boolean)]);
+    const folders = new Set([booksFolder(), ...libraryFiles().map((f) => dirName(f.path)).filter(Boolean)]);
     $('#upload-folders').replaceChildren(...[...folders].map((d) => el('option', { value: d })));
+    $('#upload-form').folder.value = booksFolder();
     dialog.showModal();
   });
   dialog.addEventListener('close', async () => {
@@ -550,7 +741,7 @@ function bindGlobal() {
   $('#lib-search').addEventListener('input', debounce(drawLibrary, 120));
   document.querySelector('.loading-back').addEventListener('click', (e) => {
     e.preventDefault();
-    location.hash = '';
+    location.hash = subjectHash(app.subject);
   });
   window.addEventListener('hashchange', route);
   // Leaving the app (switching tab/app, locking the phone): flush pending changes.
