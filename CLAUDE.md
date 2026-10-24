@@ -36,7 +36,8 @@ that can write to the private repo, so:
 3. Run the tests: `cd tests && npm ci && PW_CHROMIUM_PATH=... node run-all.mjs`
    (in Claude cloud sessions use `PW_CHROMIUM_PATH=/opt/pw-browsers/chromium`, or
    `/opt/pw-browsers/chromium/chrome-linux/chrome` if that is a directory layout; never run `playwright install` there).
-   Optionally also against the real course: `CONTENT_DIR=/path/to/Learn node run-all.mjs review course`.
+   Optionally also against the real course: `CONTENT_DIR=/path/to/Learn node run-all.mjs review course`, and
+   `CONTENT_DIR=/path/to/Learn SUBJECT=<folder> node run-all.mjs render` (every page and card of a subject renders).
 4. Commit and push to `main` (or work on a branch, then merge it into `main` and delete it, remote and
    local: no leftover branches); CI (`.github/workflows/ci.yml`) tests and deploys to Pages.
    GitHub Actions are pinned to full commit SHAs.

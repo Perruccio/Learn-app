@@ -9,6 +9,7 @@ with `api.github.com` mocked inside the browser context (no network, no token, n
 | `security` | malicious PDF (JS, XFA, links), CSP, sanitization of synced JSON |
 | `review` | flashcards: unlock on session completion, FSRS review, KaTeX, hostile card content, sync |
 | `course` | progress page, session stepper, to-dos, error log, solutions, completion, hostile markdown |
+| `render` | every page and flashcard of one subject (`SUBJECT`, default `math`) renders: KaTeX errors, stepper |
 | `subjects` | several subjects: home dashboard, per-subject library, path, review, upload folder, hostile `s=` |
 | `upload` | PDF upload via the Git Data API, concurrent push, rejected inputs |
 | `update` | a newer `version.json` reloads the app exactly once |
@@ -28,6 +29,7 @@ npm test                          # all suites; or: node run-all.mjs course revi
 |---|---|---|
 | `APP_URL` | `http://localhost:8765/` | app under test |
 | `CONTENT_DIR` | `fixtures/content` | Learn-like content root (contains `math/`) |
+| `SUBJECT` | `math` | subject folder checked by `render` |
 | `PW_CHROMIUM_PATH` | Playwright's Chromium | browser binary |
 | `BIG_PDF` | unset | large PDF for `perf` |
 
