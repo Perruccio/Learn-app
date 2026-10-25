@@ -4,7 +4,7 @@ Web PDF reader for studying from the books of the [`Perruccio/Learn`](https://gi
 
 - full-screen reading, zoom (pinch and Ctrl+wheel too), PDF table of contents, text search, a "back" button after an internal link (Alt+← too);
 - text highlights in 4 colors, area highlights (for scanned PDFs and formulas), notes on the page and notes on highlights;
-- resume from the last page read, on any device;
+- named bookmarks (reusable, synced with the annotations) and resume from the last page read on any device; the saved position wins over the page in a link (a session's chapter is used only on first opening);
 - sync through GitHub: every change is saved on the device right away and synced in the background a few seconds later (and when you close the book or leave the app). Changes made on different devices are merged, annotation by annotation;
 - PDFs downloaded only once and then read from the device cache (offline too).
 - **Path and sessions in the app**: overall and per-track progress, a page for each session (Markdown with formulas) with a phase bar (Review · Pretest · Theory · Exercises: one tap on the phase reached), personal reminders, "Skip this topic" (to recover later or dropped for good: no exercises, reviews or flashcards), solutions on demand, error log and a "Mark session as done" button. State in `<subject>/state.json`, synced. GitHub is not needed while studying.

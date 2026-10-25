@@ -354,6 +354,40 @@ await A.page.waitForSelector('#viewer .page[data-page-number="3"]');
 await sleep(800);
 check('deep link opens other book at page 3', Number(await A.page.inputValue('#page-input')) === 3);
 
+// 11b. Bookmarks and resume: the saved position wins over the page in the link
+await A.page.click('#btn-bookmark');
+await A.page.waitForSelector('#popover:not([hidden])');
+check('bookmark popover asks for a name', (await A.page.getAttribute('#pop-note', 'placeholder')) === 'Name this bookmark…');
+await A.page.keyboard.type('Chapter 3');
+await A.page.click('#pop-done');
+check('bookmark ribbon drawn on page 3', await A.page.$('.page[data-page-number="3"] .bm-ribbon'));
+await A.page.fill('#page-input', '5');
+await A.page.press('#page-input', 'Enter');
+await sleep(1600); // position save is debounced
+await A.page.evaluate(() => (location.hash = '#'));
+await A.page.waitForSelector('#view-library:not([hidden])');
+await A.page.evaluate(() => (location.hash = '#read=math/books/williams.pdf&page=2'));
+await A.page.waitForSelector('#viewer .page[data-page-number="5"]');
+await A.page.waitForFunction(() => document.querySelector('#reader-loading').hidden);
+await sleep(800);
+check('reopening resumes at the last page, not the linked one', Number(await A.page.inputValue('#page-input')) === 5, await A.page.inputValue('#page-input'));
+await A.page.click('#btn-panel');
+await A.page.click('[data-panel-tab="bookmarks"]');
+const bmItems = await A.page.$$eval('#bm-list .ann-item', (els) => els.map((e) => e.textContent));
+check('bookmarks tab lists the bookmark', bmItems.length === 1 && bmItems[0].includes('Chapter 3') && bmItems[0].includes('p. 3'), bmItems.join(' | '));
+await A.page.click('[data-panel-tab="notes"]');
+check('bookmarks are not listed as annotations', !(await A.page.$$eval('#ann-list .ann-item', (els) => els.some((e) => e.textContent.includes('Bookmark')))));
+await A.page.click('[data-panel-tab="bookmarks"]');
+await A.page.click('#bm-list .ann-item');
+await sleep(500);
+check('bookmark jumps to its page', Number(await A.page.inputValue('#page-input')) === 3, await A.page.inputValue('#page-input'));
+check('bookmark jump can be undone', await A.page.isVisible('#btn-jump-back'));
+if (!(await A.page.$eval('#panel', (e) => e.hidden))) await A.page.click('#panel-close');
+await A.page.click('#view-reader [data-sync-pill]');
+await A.page.waitForFunction(() => document.querySelector('[data-sync-pill]').dataset.state === 'synced', null, { timeout: 15000 });
+const williams = JSON.parse(repo.get('math/books/williams.annotations.json').buf.toString());
+check('bookmark synced to the repo', williams.annotations.some((a) => a.type === 'bookmark' && a.page === 3 && a.note === 'Chapter 3' && typeof a.y === 'number'), JSON.stringify(williams.annotations));
+
 // 12. Missing book message
 await A.page.evaluate(() => (location.hash = '#read=math/books/missing.pdf'));
 await A.page.waitForSelector('#reader-loading.is-error:not([hidden])');

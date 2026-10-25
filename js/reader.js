@@ -3,12 +3,12 @@
 // Annotation geometry is stored as fractions of the page box ([x, y, w, h] in
 // 0..1), so it is independent of zoom level and device.
 
-import { $, el, debounce, clamp, isNarrow, prettyName, storage, toast, uid } from './util.js?v=7671404f58f4';
-import { liveAnnotations } from './sync.js?v=7671404f58f4';
+import { $, el, debounce, clamp, isNarrow, prettyName, storage, toast, uid } from './util.js?v=a5f3b542b585';
+import { liveAnnotations } from './sync.js?v=a5f3b542b585';
 
 export const COLORS = ['yellow', 'green', 'blue', 'pink'];
 const COLOR_LABELS = { yellow: 'Yellow', green: 'Green', blue: 'Blue', pink: 'Pink' };
-const TYPE_LABELS = { highlight: 'Highlight', area: 'Area', note: 'Note' };
+const TYPE_LABELS = { highlight: 'Highlight', area: 'Area', note: 'Note', bookmark: 'Bookmark' };
 
 const VENDOR = new URL('../vendor/pdfjs/', import.meta.url).href;
 const PDF_CACHE = 'learn-reader-pdf-v1';
@@ -205,7 +205,9 @@ export class Reader {
 
       const savedZoom = storage.get(`learnreader:zoom:${file.path}`);
       this.viewer.currentScaleValue = savedZoom || (isNarrow() ? 'page-width' : 'auto');
-      const startPage = clamp(page || this.doc.lastPage?.page || 1, 1, pdf.numPages);
+      // The saved reading position wins over the requested page (e.g. a session's chapter):
+      // the requested page is only used the first time the book is opened.
+      const startPage = clamp(this.doc.lastPage?.page || page || 1, 1, pdf.numPages);
       this.viewer.currentPageNumber = startPage;
       $('#page-total').textContent = pdf.numPages;
       this._updatePageIndicator(startPage);
@@ -214,12 +216,12 @@ export class Reader {
       this._renderOutline();
 
       // Pull remote annotations in the background; follow the remote reading
-      // position only if the user has not moved yet and no page was requested.
+      // position only if the user has not moved yet.
       const localPosition = this.doc.lastPage;
       this.sync
         .sync(file.path)
         .then((doc) => {
-          if (page || this.book !== file.path || !this.viewer) return;
+          if (this.book !== file.path || !this.viewer) return;
           const remote = doc.lastPage;
           if (remote && remote !== localPosition && remote.page !== startPage && this.viewer.currentPageNumber === startPage) {
             this.viewer.currentPageNumber = clamp(remote.page, 1, pdf.numPages);
@@ -352,6 +354,23 @@ export class Reader {
     const nodes = [];
     for (const a of annotations) {
       const active = a.id === this.activeId ? ' is-active' : '';
+      if (a.type === 'bookmark') {
+        nodes.push(
+          el('button', {
+            class: `bm-ribbon c-${a.color}${active}`,
+            type: 'button',
+            title: a.note || 'Bookmark',
+            'aria-label': 'Open bookmark',
+            dataset: { id: a.id },
+            style: { top: `${a.y * 100}%` },
+            onclick: (e) => {
+              e.stopPropagation();
+              this.openPopover(a.id);
+            },
+          }),
+        );
+        continue;
+      }
       if (a.type === 'note') {
         nodes.push(
           el(
@@ -393,8 +412,20 @@ export class Reader {
     for (let i = 1; i <= this.viewer.pagesCount; i++) {
       if (byPage.has(i) || this._layerFor(i, false)) this.renderLayer(i, byPage);
     }
-    const count = liveAnnotations(this.doc).length;
+    this._updateCount();
+  }
+
+  _updateCount() {
+    const count = liveAnnotations(this.doc).filter((a) => a.type !== 'bookmark').length;
     $('#annotation-count').textContent = count ? String(count) : '';
+  }
+
+  /** Save the current reading position as a named, reusable bookmark. */
+  addBookmark() {
+    if (!this.viewer || !this.pdf) return;
+    const { page, y } = this._currentPosition();
+    const id = this._add({ type: 'bookmark', page, y: clamp(y, 0, 1) });
+    this.openPopover(id, { focus: true });
   }
 
   // ------------------------------------------------------------------ editing
@@ -709,6 +740,7 @@ export class Reader {
     quote.hidden = !a.text;
     const note = $('#pop-note');
     note.value = a.note || '';
+    note.placeholder = a.type === 'bookmark' ? 'Name this bookmark…' : 'Write a note…';
     this._syncPopoverColors(a.color);
     $('#popover').hidden = false;
     if (previous) this.renderLayer(this.doc.annotations[previous]?.page);
@@ -732,6 +764,11 @@ export class Reader {
 
   goToAnnotation(a) {
     if (!this.viewer) return;
+    if (a.type === 'bookmark') {
+      this._pushJump();
+      this._scrollTo(a);
+      return;
+    }
     this.viewer.scrollPageIntoView({ pageNumber: a.page });
     requestAnimationFrame(() => {
       const pageEl = this.viewer.getPageView(a.page - 1)?.div;
@@ -769,6 +806,11 @@ export class Reader {
   jumpBack() {
     const pos = this.jumps.pop();
     this._updateJumpButton();
+    this._scrollTo(pos);
+  }
+
+  /** Scroll so that the viewport top is at `y` page heights into `page`. */
+  _scrollTo(pos) {
     if (!pos || !this.viewer || !this.pdf) return;
     const page = clamp(pos.page, 1, this.pdf.numPages);
     this.viewer.scrollPageIntoView({ pageNumber: page });
@@ -855,6 +897,7 @@ export class Reader {
     $('#btn-fullscreen').addEventListener('click', () => this.toggleFullscreen());
     $('#btn-exit-immersive').addEventListener('click', () => this._exitImmersive());
     $('#btn-jump-back').addEventListener('click', () => this.jumpBack());
+    $('#btn-bookmark').addEventListener('click', () => this.addBookmark());
 
     document.addEventListener('keydown', (e) => {
       if (!this.book || this.root.hidden) return;
@@ -883,6 +926,8 @@ export class Reader {
         this.viewer?.decreaseScale();
       } else if (!e.ctrlKey && e.key === 'f') {
         this.toggleFullscreen();
+      } else if (!e.ctrlKey && e.key === 'b') {
+        this.addBookmark();
       }
     });
 
@@ -992,9 +1037,14 @@ export class Reader {
   }
 
   renderAnnotationList() {
-    const list = $('#ann-list');
-    const items = this.doc ? liveAnnotations(this.doc) : [];
-    $('#ann-empty').hidden = items.length > 0;
+    const all = this.doc ? liveAnnotations(this.doc) : [];
+    this._renderList($('#ann-list'), $('#ann-empty'), all.filter((a) => a.type !== 'bookmark'));
+    this._renderList($('#bm-list'), $('#bm-empty'), all.filter((a) => a.type === 'bookmark'));
+    this._updateCount();
+  }
+
+  _renderList(list, empty, items) {
+    empty.hidden = items.length > 0;
     list.replaceChildren(
       ...items.map((a) =>
         el(
@@ -1009,7 +1059,7 @@ export class Reader {
               onclick: () => {
                 if (isNarrow()) this.closePanel();
                 this.goToAnnotation(a);
-                this.openPopover(a.id);
+                if (a.type !== 'bookmark') this.openPopover(a.id);
               },
             },
             el('span', { class: `ann-swatch c-${a.color}`, 'aria-hidden': 'true' }),
@@ -1024,8 +1074,6 @@ export class Reader {
         ),
       ),
     );
-    const count = items.length;
-    $('#annotation-count').textContent = count ? String(count) : '';
   }
 
   async _renderOutline() {

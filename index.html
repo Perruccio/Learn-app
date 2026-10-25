@@ -21,7 +21,7 @@
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="vendor/pdfjs/web/pdf_viewer.css">
   <link rel="stylesheet" href="vendor/katex/katex.min.css">
-  <link rel="stylesheet" href="css/app.css?v=7671404f58f4">
+  <link rel="stylesheet" href="css/app.css?v=a5f3b542b585">
 </head>
 <body data-view="">
   <svg class="sprite" width="0" height="0" aria-hidden="true">
@@ -44,6 +44,7 @@
       <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 7.5L5 11.5l4 4"/><path d="M5 11.5h9.5a4.5 4.5 0 0 1 0 9H12"/></symbol>
       <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
       <symbol id="i-path" viewBox="0 0 24 24"><circle cx="6" cy="18" r="2.2"/><circle cx="18" cy="6" r="2.2"/><path d="M8.2 18H15a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h6.8"/></symbol>
+      <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M7 4.5h10v15l-5-4-5 4z"/></symbol>
       <symbol id="i-book" viewBox="0 0 24 24"><path d="M5 4.5h10.5a3 3 0 0 1 3 3v12H8a3 3 0 0 1-3-3z"/><path d="M5 16.5a3 3 0 0 1 3-3h10.5"/></symbol>
     </defs>
   </svg>
@@ -256,11 +257,12 @@
         <button type="button" class="icon-btn hide-narrow" id="zoom-in" aria-label="Zoom in"><svg class="icon"><use href="#i-plus"/></svg></button>
       </div>
       <div class="tb-group tb-right">
+        <button type="button" class="icon-btn" id="btn-bookmark" title="Bookmark this position (B)" aria-label="Add bookmark"><svg class="icon"><use href="#i-bookmark"/></svg></button>
         <button type="button" class="icon-btn" data-tool="area" aria-pressed="false" title="Highlight an area (for scanned PDFs and formulas)" aria-label="Highlight area"><svg class="icon"><use href="#i-area"/></svg></button>
         <button type="button" class="icon-btn" data-tool="note" aria-pressed="false" title="Add a note on the page" aria-label="Add note"><svg class="icon"><use href="#i-note"/></svg></button>
         <span class="tool-colors hide-narrow" id="tool-colors" role="group" aria-label="Color"></span>
         <span class="tb-divider hide-narrow"></span>
-        <button type="button" class="icon-btn" id="btn-panel" title="Annotations, contents, search" aria-label="Panel"><svg class="icon"><use href="#i-panel"/></svg><span class="badge" id="annotation-count"></span></button>
+        <button type="button" class="icon-btn" id="btn-panel" title="Annotations, bookmarks, contents, search" aria-label="Panel"><svg class="icon"><use href="#i-panel"/></svg><span class="badge" id="annotation-count"></span></button>
         <button type="button" class="sync-pill compact" data-sync-pill title="Sync now"><svg class="icon"><use href="#i-sync"/></svg><span class="sync-text">Synced</span></button>
         <button type="button" class="icon-btn" id="btn-fullscreen" title="Full screen (F)" aria-label="Full screen"><svg class="icon"><use href="#i-expand"/></svg></button>
       </div>
@@ -288,6 +290,7 @@
       <div class="panel-head">
         <div class="tabs" role="tablist">
           <button type="button" role="tab" data-panel-tab="notes" aria-selected="true">Annotations</button>
+          <button type="button" role="tab" data-panel-tab="bookmarks" aria-selected="false">Bookmarks</button>
           <button type="button" role="tab" data-panel-tab="outline" aria-selected="false">Contents</button>
           <button type="button" role="tab" data-panel-tab="search" aria-selected="false">Search</button>
         </div>
@@ -296,6 +299,10 @@
       <div class="panel-body" data-panel-body="notes">
         <p id="ann-empty" class="panel-empty">No annotations. Select text to highlight it, or use the Area and Note tools.</p>
         <ul id="ann-list" class="ann-list"></ul>
+      </div>
+      <div class="panel-body" data-panel-body="bookmarks" hidden>
+        <p id="bm-empty" class="panel-empty">No bookmarks. Use the bookmark button in the toolbar to save the current position.</p>
+        <ul id="bm-list" class="ann-list"></ul>
       </div>
       <div class="panel-body" data-panel-body="outline" hidden>
         <p id="outline-empty" class="panel-empty" hidden>This PDF has no table of contents.</p>
@@ -336,6 +343,6 @@
 
   <div id="toasts" class="toasts" aria-live="polite"></div>
 
-  <script type="module" src="js/app.js?v=7671404f58f4"></script>
+  <script type="module" src="js/app.js?v=a5f3b542b585"></script>
 </body>
 </html>

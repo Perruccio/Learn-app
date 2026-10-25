@@ -21,6 +21,7 @@ put(
         { id: 'xss2', type: 'highlight', page: 1, color: 'yellow" onmouseover="window.__pwned=1', text: '<img src=x onerror="window.__pwned=1">', note: '<script>window.__pwned=1</script>', rects: [[0.1, 0.3, 0.3, 0.02]], onclick: 'window.__pwned=1', createdAt: 2, updatedAt: 2 },
         { id: 'css', type: 'area', page: 1, color: 'blue', rects: [['0;background:url(https://evil.example/x)', 0, 1, 1]], createdAt: 3, updatedAt: 3 },
         { id: 'pin', type: 'note', page: 1, color: 'pink', x: 'javascript:alert(1)', y: 0.5, note: 'x' },
+        { id: 'bm-bad', type: 'bookmark', page: 1, color: 'green', y: '0;top:-9999px' },
         { id: 'bad-type', type: '<svg onload=alert(1)>', page: 1, color: 'blue', rects: [[0.1, 0.5, 0.2, 0.02]], createdAt: 4, updatedAt: 4 },
       ],
     }),

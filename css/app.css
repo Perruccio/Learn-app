@@ -331,6 +331,12 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
 }
 .note-pin.is-active { outline: 2px solid #1d1d1f; outline-offset: 2px; }
+.bm-ribbon {
+  position: absolute; right: 10px; pointer-events: auto; width: 16px; height: 24px; border: 0; padding: 0; cursor: pointer;
+  background: rgb(var(--c)); clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 72%, 0 100%);
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
+}
+.bm-ribbon.is-active { outline: 2px solid #1d1d1f; outline-offset: 2px; }
 @media print { .hl-layer { display: none; } }
 
 /* loading */

@@ -5,7 +5,7 @@
 // pulls the remote file, merges per annotation (newest `updatedAt` wins,
 // deletions are kept as tombstones) and pushes the result.
 
-import { storage, prettyName } from './util.js?v=7671404f58f4';
+import { storage, prettyName } from './util.js?v=a5f3b542b585';
 
 const DOC_VERSION = 1;
 const TOMBSTONE_TTL_MS = 180 * 24 * 3600 * 1000;
@@ -21,7 +21,7 @@ export function emptyDoc(book) {
 }
 
 const COLORS = new Set(['yellow', 'green', 'blue', 'pink']);
-const TYPES = new Set(['highlight', 'area', 'note']);
+const TYPES = new Set(['highlight', 'area', 'note', 'bookmark']);
 const MAX_PAGE = 100000;
 
 const finiteOr = (v, fallback) => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
@@ -50,7 +50,11 @@ export function sanitizeAnnotation(a) {
   out.color = COLORS.has(a.color) ? a.color : 'yellow';
   if (typeof a.text === 'string' && a.text) out.text = a.text.slice(0, 4000);
   if (typeof a.note === 'string') out.note = a.note.slice(0, 20000);
-  if (out.type === 'note') {
+  if (out.type === 'bookmark') {
+    // A saved reading position: page plus the viewport top, in page heights.
+    if (!inUnit(a.y)) return null;
+    out.y = a.y;
+  } else if (out.type === 'note') {
     if (!inUnit(a.x) || !inUnit(a.y)) return null;
     out.x = a.x;
     out.y = a.y;
