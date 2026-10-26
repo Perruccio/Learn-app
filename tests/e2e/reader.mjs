@@ -232,7 +232,17 @@ await A.page.fill('#find-input', 'vector space');
 await A.page.press('#find-input', 'Enter');
 await sleep(1200);
 check('search finds matches', /of \d+/.test(await A.page.textContent('#find-status')), await A.page.textContent('#find-status'));
+check('search highlights matches', (await A.page.$$('.textLayer .highlight')).length > 0);
+await A.page.click('[data-panel-tab="outline"]');
+await sleep(400);
+check('leaving the search tab clears the highlights', (await A.page.$$('.textLayer .highlight')).length === 0);
+await A.page.click('[data-panel-tab="search"]');
+await A.page.press('#find-input', 'Enter');
+await sleep(1200);
+check('searching again restores the highlights', (await A.page.$$('.textLayer .highlight')).length > 0);
 await A.page.click('#panel-close');
+await sleep(400);
+check('closing the panel clears the highlights', (await A.page.$$('.textLayer .highlight')).length === 0);
 
 // 6b. Back button after following an internal PDF link
 let dialogs = 0;

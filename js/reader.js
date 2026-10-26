@@ -3,8 +3,8 @@
 // Annotation geometry is stored as fractions of the page box ([x, y, w, h] in
 // 0..1), so it is independent of zoom level and device.
 
-import { $, el, debounce, clamp, isNarrow, prettyName, storage, toast, uid } from './util.js?v=a5f3b542b585';
-import { liveAnnotations } from './sync.js?v=a5f3b542b585';
+import { $, el, debounce, clamp, isNarrow, prettyName, storage, toast, uid } from './util.js?v=3543b6911ed6';
+import { liveAnnotations } from './sync.js?v=3543b6911ed6';
 
 export const COLORS = ['yellow', 'green', 'blue', 'pink'];
 const COLOR_LABELS = { yellow: 'Yellow', green: 'Green', blue: 'Blue', pink: 'Pink' };
@@ -197,6 +197,8 @@ export class Reader {
         return;
       }
       this.pdf = pdf;
+      this.findQuery = ''; // a new document starts a fresh search
+      $('#find-status').textContent = '';
       this._createViewer();
       const ready = new Promise((resolve) => this.eventBus.on('pagesinit', resolve, { once: true }));
       this.viewer.setDocument(pdf);
@@ -1021,6 +1023,10 @@ export class Reader {
     });
     $('#find-prev').addEventListener('click', () => this._find(true));
     $('#find-next').addEventListener('click', () => this._find(false));
+    // Clearing the field (typing it empty or the native "x") ends the search.
+    $('#find-input').addEventListener('input', (e) => {
+      if (!e.target.value.trim()) this._closeFind();
+    });
   }
 
   openPanel(tab = storage.get('learnreader:panelTab', 'notes')) {
@@ -1029,11 +1035,13 @@ export class Reader {
     storage.set('learnreader:panelTab', tab);
     for (const t of document.querySelectorAll('[data-panel-tab]')) t.setAttribute('aria-selected', String(t.dataset.panelTab === tab));
     for (const body of document.querySelectorAll('[data-panel-body]')) body.hidden = body.dataset.panelBody !== tab;
+    if (tab !== 'search') this._closeFind();
   }
 
   closePanel() {
     this.root.classList.remove('panel-open');
     $('#panel').hidden = true;
+    this._closeFind();
   }
 
   renderAnnotationList() {
@@ -1134,7 +1142,16 @@ export class Reader {
     });
   }
 
+  /** Ends the current search: removes the match highlights from every page. */
+  _closeFind() {
+    if (!this.findQuery) return;
+    this.findQuery = '';
+    $('#find-status').textContent = '';
+    this.eventBus?.dispatch('findbarclose', { source: this });
+  }
+
   _updateFindStatus(matchesCount, state) {
+    if (!this.findQuery) return; // late updates after the search was closed
     const status = $('#find-status');
     if (state === 1 /* NOT_FOUND */ || (matchesCount && matchesCount.total === 0)) {
       status.textContent = 'No results';

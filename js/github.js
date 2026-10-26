@@ -1,6 +1,6 @@
 // Minimal GitHub REST client for a single repository (contents, trees, blobs).
 
-import { b64decodeUtf8, b64encodeUtf8 } from './util.js?v=a5f3b542b585';
+import { b64decodeUtf8, b64encodeUtf8 } from './util.js?v=3543b6911ed6';
 
 const API = 'https://api.github.com';
 
