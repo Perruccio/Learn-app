@@ -19,6 +19,7 @@ putRepo('README.md', Buffer.from('# Learn\n'));
 const log = [];
 let forceConflictOnce = false;
 let networkDown = false;
+let annotationsDelay = 0; // ms added to GETs of *.annotations.json (slow network)
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -51,6 +52,7 @@ async function handle(route) {
   if (m) {
     const file = m[1];
     if (method === 'GET') {
+      if (annotationsDelay && file.endsWith('.annotations.json')) await new Promise((r) => setTimeout(r, annotationsDelay));
       const entry = repo.get(file);
       if (!entry) return json(404, { message: 'Not Found' });
       return json(200, { sha: entry.sha, content: entry.buf.toString('base64'), encoding: 'base64' });
@@ -418,6 +420,36 @@ for (const n of [2, 3, 4, 5]) {
 }
 await sleep(6000);
 check('page turns alone do not commit', log.filter((l) => l.startsWith('PUT')).length === putsBefore);
+
+// 14b. A newer position from another device wins even on a slow network
+// (opening the book must not re-save the old page with a fresh timestamp)
+await A.page.evaluate(() => (location.hash = '#'));
+await A.page.waitForSelector('#view-library:not([hidden])');
+await A.page.waitForFunction(() => document.querySelector('[data-sync-pill]').dataset.state === 'synced', null, { timeout: 15000 });
+const setRemotePage = (page) => {
+  const d = remoteAnn();
+  d.lastPage = { page, at: Date.now() };
+  putRepo('math/books/axler-ladr-4ed.annotations.json', Buffer.from(JSON.stringify(d, null, 2)));
+};
+setRemotePage(3);
+annotationsDelay = 3000;
+await A.page.evaluate(() => (location.hash = '#read=math/books/axler-ladr-4ed.pdf'));
+await A.page.waitForFunction(() => document.querySelector('#reader-loading').hidden);
+check('opens at the local position first', Number(await A.page.inputValue('#page-input')) === 5, await A.page.inputValue('#page-input'));
+await sleep(5000);
+annotationsDelay = 0;
+check('then follows the newer position from another device', Number(await A.page.inputValue('#page-input')) === 3, await A.page.inputValue('#page-input'));
+await A.page.waitForFunction(() => document.querySelector('[data-sync-pill]').dataset.state === 'synced', null, { timeout: 15000 });
+check('opening does not overwrite the newer remote position', remoteAnn().lastPage?.page === 3, JSON.stringify(remoteAnn().lastPage));
+
+// 14c. Coming back to the app follows a position saved meanwhile on another device
+setRemotePage(2);
+await A.page.evaluate(() => {
+  Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+  document.dispatchEvent(new Event('visibilitychange'));
+});
+await sleep(2000);
+check('returning to the app follows the other device', Number(await A.page.inputValue('#page-input')) === 2, await A.page.inputValue('#page-input'));
 
 await A.page.screenshot({ path: `${SHOTS}/06-reader.png` });
 check('no JS errors on A', A.errors.length === 0, A.errors.join(' | '));

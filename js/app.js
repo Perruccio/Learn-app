@@ -1,15 +1,15 @@
 // App shell: configuration, routing, library and sync triggers.
 
-import { $, el, debounce, dirName, formatSize, prettyName, storage, toast } from './util.js?v=3543b6911ed6';
-import { GitHub } from './github.js?v=3543b6911ed6';
-import { SyncManager, liveAnnotations, migrateLegacyStorage } from './sync.js?v=3543b6911ed6';
-import { Reader, isPdfCached } from './reader.js?v=3543b6911ed6';
-import { loadDecks, loadMath, parseProgress, progressCodec, readText, tickSession } from './cards.js?v=3543b6911ed6';
-import { ReviewSession, summarize } from './review.js?v=3543b6911ed6';
-import { Course, inSubject, progressBar, skipOf, stateCodec, subjectOf, subjectsOf } from './course.js?v=3543b6911ed6';
+import { $, el, debounce, dirName, formatSize, prettyName, storage, toast } from './util.js?v=8c2e7c86c234';
+import { GitHub } from './github.js?v=8c2e7c86c234';
+import { SyncManager, liveAnnotations, migrateLegacyStorage } from './sync.js?v=8c2e7c86c234';
+import { Reader, isPdfCached } from './reader.js?v=8c2e7c86c234';
+import { loadDecks, loadMath, parseProgress, progressCodec, readText, tickSession } from './cards.js?v=8c2e7c86c234';
+import { ReviewSession, summarize } from './review.js?v=8c2e7c86c234';
+import { Course, inSubject, progressBar, skipOf, stateCodec, subjectOf, subjectsOf } from './course.js?v=8c2e7c86c234';
 
 // Stamped by scripts/stamp.py on every release (do not edit by hand).
-const APP_VERSION = '3543b6911ed6';
+const APP_VERSION = '8c2e7c86c234';
 const CONFIG_KEY = 'learnreader:config';
 const MAX_UPLOAD_BYTES = 95 * 1024 * 1024;
 
@@ -754,7 +754,7 @@ function bindGlobal() {
       app.cards.syncAll();
       app.state.syncAll();
     } else if (app.reader?.book) {
-      app.sync.sync(app.reader.book).catch(() => {}); // pull edits made on other devices
+      app.reader.pullPosition(); // pull edits and the reading position from other devices
     }
   });
   window.addEventListener('pagehide', () => {

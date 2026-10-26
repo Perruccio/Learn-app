@@ -3,8 +3,8 @@
 // Annotation geometry is stored as fractions of the page box ([x, y, w, h] in
 // 0..1), so it is independent of zoom level and device.
 
-import { $, el, debounce, clamp, isNarrow, prettyName, storage, toast, uid } from './util.js?v=3543b6911ed6';
-import { liveAnnotations } from './sync.js?v=3543b6911ed6';
+import { $, el, debounce, clamp, isNarrow, prettyName, storage, toast, uid } from './util.js?v=8c2e7c86c234';
+import { liveAnnotations } from './sync.js?v=8c2e7c86c234';
 
 export const COLORS = ['yellow', 'green', 'blue', 'pink'];
 const COLOR_LABELS = { yellow: 'Yellow', green: 'Green', blue: 'Blue', pink: 'Pink' };
@@ -127,8 +127,12 @@ export class Reader {
     this.findQuery = '';
     this.jumps = []; // positions to return to after following a link (most recent last)
 
+    this.restoringPage = null; // start page while the remote position is being fetched
     this.savePosition = debounce((page) => {
-      if (!this.book) return;
+      if (!this.book || page === this.restoringPage) return;
+      // Re-saving the same page would refresh its timestamp and beat a newer position
+      // from another device, so only real moves are saved.
+      if (this.sync.load(this.book).doc.lastPage?.page === page) return;
       this.sync.mutate(this.book, (d) => (d.lastPage = { page, at: Date.now() }), { schedule: false, silent: true });
     }, 1200);
     this.saveNote = debounce((id, text) => this._update(id, { note: text }), 500);
@@ -217,23 +221,39 @@ export class Reader {
       this.renderAnnotationList();
       this._renderOutline();
 
-      // Pull remote annotations in the background; follow the remote reading
-      // position only if the user has not moved yet.
-      const localPosition = this.doc.lastPage;
-      this.sync
-        .sync(file.path)
-        .then((doc) => {
-          if (this.book !== file.path || !this.viewer) return;
-          const remote = doc.lastPage;
-          if (remote && remote !== localPosition && remote.page !== startPage && this.viewer.currentPageNumber === startPage) {
-            this.viewer.currentPageNumber = clamp(remote.page, 1, pdf.numPages);
-          }
-        })
-        .catch(() => {});
+      // Pull remote annotations in the background and follow a newer reading position
+      // from another device. Until then the start page is not saved as a new position.
+      this.restoringPage = startPage;
+      this.pullPosition().finally(() => {
+        if (this.book === file.path) this.restoringPage = null;
+      });
     } catch (err) {
       console.error(err);
       this._showLoading(err.status === 404 ? 'Book not found in the repository.' : `Cannot open the book: ${err.message}`, null, true);
     }
+  }
+
+  /**
+   * Sync the open book and, if another device saved a newer reading position,
+   * go there (only if the user has not moved meanwhile; the back button returns).
+   */
+  async pullPosition() {
+    const book = this.book;
+    if (!book || !this.viewer) return;
+    const here = this.viewer.currentPageNumber;
+    const before = this.sync.load(book).doc.lastPage;
+    let doc;
+    try {
+      doc = await this.sync.sync(book);
+    } catch {
+      return;
+    }
+    if (this.book !== book || !this.viewer || !this.pdf) return;
+    const remote = doc?.lastPage;
+    if (!remote || (remote.at || 0) <= (before?.at || 0)) return;
+    if (remote.page === here || this.viewer.currentPageNumber !== here) return;
+    this._pushJump();
+    this.viewer.currentPageNumber = clamp(remote.page, 1, this.pdf.numPages);
   }
 
   async close() {
@@ -245,6 +265,7 @@ export class Reader {
     this._exitImmersive();
     const book = this.book;
     this.book = null;
+    this.restoringPage = null;
     this.jumps = [];
     this._updateJumpButton();
     this.file = null;
