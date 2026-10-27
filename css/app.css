@@ -365,11 +365,12 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
   .panel { width: min(420px, 100%); box-shadow: var(--shadow); }
 }
 .panel-head { display: flex; align-items: center; gap: 6px; padding: 8px 8px 8px 12px; border-bottom: 1px solid var(--line); }
-.tabs { display: flex; gap: 2px; flex: 1; background: var(--surface-2); padding: 3px; border-radius: 10px; }
+.tabs { display: flex; gap: 2px; flex: 1; min-width: 0; background: var(--surface-2); padding: 3px; border-radius: 10px; }
 .tabs button {
-  flex: 1; border: 0; background: transparent; height: 30px; border-radius: 8px; cursor: pointer;
-  font-size: 13px; font-weight: 600; color: var(--muted);
+  flex: 1; min-width: 0; padding: 0 4px; border: 0; background: transparent; height: 30px; border-radius: 8px; cursor: pointer;
+  font-size: 13px; font-weight: 600; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+.panel-head .icon-btn { flex-shrink: 0; }
 .tabs button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1); }
 .panel-body { flex: 1; overflow: auto; padding: 8px 8px calc(16px + var(--safe-bottom)); }
 .panel-empty { color: var(--muted); font-size: 14px; padding: 12px 8px; margin: 0; }

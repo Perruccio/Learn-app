@@ -5,7 +5,7 @@
 // pulls the remote file, merges per annotation (newest `updatedAt` wins,
 // deletions are kept as tombstones) and pushes the result.
 
-import { storage, prettyName } from './util.js?v=8c2e7c86c234';
+import { storage, prettyName } from './util.js?v=ab27f989bd6f';
 
 const DOC_VERSION = 1;
 const TOMBSTONE_TTL_MS = 180 * 24 * 3600 * 1000;

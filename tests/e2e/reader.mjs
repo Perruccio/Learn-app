@@ -242,6 +242,19 @@ await A.page.click('[data-panel-tab="search"]');
 await A.page.press('#find-input', 'Enter');
 await sleep(1200);
 check('searching again restores the highlights', (await A.page.$$('.textLayer .highlight')).length > 0);
+// A wider font (fallback fonts on another system) must not push the close button out of the panel
+const closeFits = await A.page.evaluate(() => {
+  const tabs = [...document.querySelectorAll('.tabs button')];
+  for (const b of tabs) {
+    b.style.fontFamily = '"DejaVu Sans", Verdana, sans-serif';
+    b.style.fontSize = '15px';
+  }
+  const panel = document.querySelector('.panel').getBoundingClientRect();
+  const close = document.querySelector('#panel-close').getBoundingClientRect();
+  tabs.forEach((b) => b.removeAttribute('style'));
+  return close.left >= panel.left && close.right <= panel.right + 0.5 && close.width >= 30;
+});
+check('panel close button stays inside the panel with wide fonts', closeFits);
 await A.page.click('#panel-close');
 await sleep(400);
 check('closing the panel clears the highlights', (await A.page.$$('.textLayer .highlight')).length === 0);
