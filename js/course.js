@@ -5,9 +5,9 @@
 // session, personal to-dos and the error log are stored in "<base>/state.json"
 // (synced like annotations).
 
-import { el, dirName, toast, uid } from './util.js?v=ab27f989bd6f';
-import { loadMath, parseProgress, readText, setSessionDone } from './cards.js?v=ab27f989bd6f';
-import { joinPath, renderMarkdown } from './markdown.js?v=ab27f989bd6f';
+import { el, dirName, toast, uid } from './util.js?v=618e88174c27';
+import { loadMath, parseProgress, readText, setSessionDone } from './cards.js?v=618e88174c27';
+import { joinPath, renderMarkdown } from './markdown.js?v=618e88174c27';
 
 const SESSION_ID = /^[A-Z]\d{2,4}$/;
 const ID_RE = /^[a-z0-9]{4,24}$/;
@@ -376,11 +376,13 @@ export class Course {
     this.view.progressPath = progressFile?.path;
 
     const stepper = el('nav', { class: 'stepper', 'aria-label': 'Where you are' });
+    const reminders = el('section', { class: 'panel-card session-reminders', 'aria-label': 'Reminders' });
     const end = el('section', { class: 'panel-card session-end', id: 'session-end' });
     const solutionsPath = joinPath(dirName(dirName(path)), `solutions/${sid}.md`);
     const solutions = el('section', { class: 'solutions', hidden: true });
-    container.replaceChildren(stepper, body, end, solutions);
-    Object.assign(this.view, { stepper, end, solutions, solutionsPath: this.file(solutionsPath) ? solutionsPath : null });
+    // Reminders sit at the top, right under the stepper, so they are seen before studying.
+    container.replaceChildren(stepper, reminders, body, end, solutions);
+    Object.assign(this.view, { stepper, reminders, end, solutions, solutionsPath: this.file(solutionsPath) ? solutionsPath : null });
     this._refreshChecks();
   }
 
@@ -421,7 +423,7 @@ export class Course {
 
     // Keep what the user is typing across re-renders (e.g. when a sync brings remote changes).
     const typed = {
-      add: v.end.querySelector('.add-input')?.value || '',
+      add: v.reminders.querySelector('.add-input')?.value || '',
       what: v.end.querySelector('textarea[data-field="what"]')?.value || '',
       fix: v.end.querySelector('textarea[data-field="fix"]')?.value || '',
     };
@@ -499,6 +501,26 @@ export class Course {
       this.state.mutate(v.base, (d) => (d.errors[id] = { session: v.sid, text, fix: fixText, card: false, createdAt: Date.now(), updatedAt: Date.now() }));
     };
 
+    v.reminders.replaceChildren(
+      el('div', { class: 'panel-card-head' }, el('span', { class: 'eyebrow' }, 'Reminders')),
+      customs.length
+        ? el(
+            'ul',
+            { class: 'check-list' },
+            customs.map(([id, c]) =>
+              el(
+                'li',
+                { class: c.done ? 'is-checked' : '' },
+                checkbox(c.done, c.text, () => this._custom((sess) => (sess.custom[id] = { ...sess.custom[id], done: !c.done, updatedAt: Date.now() }))),
+                el('span', { class: 'check-label' }, c.text),
+                el('button', { type: 'button', class: 'icon-btn small-x', 'aria-label': 'Delete reminder', title: 'Delete', onclick: () => this._custom((sess) => (sess.custom[id] = { deleted: true, updatedAt: Date.now() })) }, '×'),
+              ),
+            ),
+          )
+        : null,
+      el('div', { class: 'add-row' }, input, el('button', { type: 'button', class: 'btn btn-small', onclick: add }, 'Add')),
+    );
+
     v.end.replaceChildren(
       el('div', { class: 'panel-card-head' }, el('span', { class: 'eyebrow' }, 'Error log')),
       errors.length
@@ -516,23 +538,6 @@ export class Course {
           )
         : el('p', { class: 'muted small' }, 'No errors logged for this session. They will become flashcards.'),
       el('div', { class: 'error-form' }, what, fix, el('button', { type: 'button', class: 'btn btn-small', onclick: addError }, 'Add error')),
-      el('div', { class: 'panel-card-head todo-head' }, el('span', { class: 'eyebrow' }, 'Reminders')),
-      customs.length
-        ? el(
-            'ul',
-            { class: 'check-list' },
-            customs.map(([id, c]) =>
-              el(
-                'li',
-                { class: c.done ? 'is-checked' : '' },
-                checkbox(c.done, c.text, () => this._custom((sess) => (sess.custom[id] = { ...sess.custom[id], done: !c.done, updatedAt: Date.now() }))),
-                el('span', { class: 'check-label' }, c.text),
-                el('button', { type: 'button', class: 'icon-btn small-x', 'aria-label': 'Delete reminder', title: 'Delete', onclick: () => this._custom((sess) => (sess.custom[id] = { deleted: true, updatedAt: Date.now() })) }, '×'),
-              ),
-            ),
-          )
-        : null,
-      el('div', { class: 'add-row' }, input, el('button', { type: 'button', class: 'btn btn-small', onclick: add }, 'Add')),
       el(
         'div',
         { class: 'panel-actions end-actions' },

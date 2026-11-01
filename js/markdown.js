@@ -6,7 +6,7 @@
 // emphasis, inline code, fenced code, links, ordered/unordered nested lists,
 // GFM tables, blockquotes, horizontal rules.
 
-import { mathNode } from './cards.js?v=ab27f989bd6f';
+import { mathNode } from './cards.js?v=618e88174c27';
 
 const ALLOWED_PROTOCOLS = ['http:', 'https:', 'mailto:'];
 

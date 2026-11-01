@@ -105,10 +105,15 @@ check('tapping the last done phase again steps back', true);
 await A.page.click('.stepper .step:nth-child(3) button');
 await A.page.waitForFunction(() => document.querySelectorAll('.stepper .step.s-done').length === 3);
 // Optional personal to-do
-await A.page.fill('.session-end .add-input', 'Redo T3 tomorrow');
-await A.page.press('.session-end .add-input', 'Enter');
-await A.page.waitForSelector('.session-end .check-list li');
-check('personal to-do added', (await A.page.textContent('.session-end .check-list')).includes('Redo T3'));
+await A.page.fill('.session-reminders .add-input', 'Redo T3 tomorrow');
+await A.page.press('.session-reminders .add-input', 'Enter');
+await A.page.waitForSelector('.session-reminders .check-list li');
+check('personal to-do added', (await A.page.textContent('.session-reminders .check-list')).includes('Redo T3'));
+check('reminders are at the top, before the session content', await A.page.evaluate(() => {
+  const r = document.querySelector('.session-reminders');
+  const md = document.querySelector('article.md');
+  return !!(r && md && r.compareDocumentPosition(md) & Node.DOCUMENT_POSITION_FOLLOWING);
+}));
 // Error log
 await A.page.fill('textarea[data-field="what"]', 'Mixed up union and sum of subspaces');
 await A.page.fill('textarea[data-field="fix"]', 'U+W is the smallest subspace containing U∪W');
@@ -224,7 +229,7 @@ const B = await device({ ...devices['iPhone 13'] });
 await B.page.evaluate(() => (location.hash = '#doc=math/sessions/S001.md'));
 await B.page.waitForSelector('.stepper .step');
 await sleep(1500);
-check('device B sees the phase reached, the to-do and the errors', (await B.page.$$('.stepper .step.s-done')).length === 4 && /session done/i.test(await B.page.textContent('.step-hint')) && (await B.page.$$('.error-list li')).length === 1 && (await B.page.$$('.session-end .check-list li')).length === 1);
+check('device B sees the phase reached, the to-do and the errors', (await B.page.$$('.stepper .step.s-done')).length === 4 && /session done/i.test(await B.page.textContent('.step-hint')) && (await B.page.$$('.error-list li')).length === 1 && (await B.page.$$('.session-reminders .check-list li')).length === 1);
 await B.page.screenshot({ path: `${SHOTS}/c3-phone-session.png` });
 await B.page.evaluate(() => (location.hash = '#path'));
 await B.page.waitForSelector('.progress-summary');

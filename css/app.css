@@ -688,7 +688,8 @@ a.check-label:hover { color: var(--accent); }
 .link-btn:hover { color: var(--ink); }
 .md h2.is-done { color: var(--muted); }
 .md h2.is-done::after { content: '  ✓'; color: var(--accent); }
-.todo-head { margin-top: 14px; }
+.session-reminders { margin: 12px 0; }
+.session-reminders .check-list { margin-top: 2px; }
 @media (max-width: 520px) {
   .step button { flex-direction: column; gap: 3px; min-height: 58px; font-size: 12px; padding: 6px 4px; }
 }

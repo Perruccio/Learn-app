@@ -1,15 +1,15 @@
 // App shell: configuration, routing, library and sync triggers.
 
-import { $, el, debounce, dirName, formatSize, prettyName, storage, toast } from './util.js?v=ab27f989bd6f';
-import { GitHub } from './github.js?v=ab27f989bd6f';
-import { SyncManager, liveAnnotations, migrateLegacyStorage } from './sync.js?v=ab27f989bd6f';
-import { Reader, isPdfCached } from './reader.js?v=ab27f989bd6f';
-import { loadDecks, loadMath, parseProgress, progressCodec, readText, tickSession } from './cards.js?v=ab27f989bd6f';
-import { ReviewSession, summarize } from './review.js?v=ab27f989bd6f';
-import { Course, inSubject, progressBar, skipOf, stateCodec, subjectOf, subjectsOf } from './course.js?v=ab27f989bd6f';
+import { $, el, debounce, dirName, formatSize, prettyName, storage, toast } from './util.js?v=618e88174c27';
+import { GitHub } from './github.js?v=618e88174c27';
+import { SyncManager, liveAnnotations, migrateLegacyStorage } from './sync.js?v=618e88174c27';
+import { Reader, isPdfCached } from './reader.js?v=618e88174c27';
+import { loadDecks, loadMath, parseProgress, progressCodec, readText, tickSession } from './cards.js?v=618e88174c27';
+import { ReviewSession, summarize } from './review.js?v=618e88174c27';
+import { Course, inSubject, progressBar, skipOf, stateCodec, subjectOf, subjectsOf } from './course.js?v=618e88174c27';
 
 // Stamped by scripts/stamp.py on every release (do not edit by hand).
-const APP_VERSION = 'ab27f989bd6f';
+const APP_VERSION = '618e88174c27';
 const CONFIG_KEY = 'learnreader:config';
 const MAX_UPLOAD_BYTES = 95 * 1024 * 1024;
 
